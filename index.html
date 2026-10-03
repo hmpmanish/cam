@@ -549,8 +549,15 @@
                 const result = await response.json();
                 if (result.status === "success") {
                     addPhotoToGallery(dataUrl);
+                    actionStatus.textContent = "System initialized. Last sync: " + new Date().toLocaleTimeString();
+                    actionStatus.style.color = "var(--text-muted)";
+                } else {
+                    actionStatus.textContent = "Server Error: " + result.message;
+                    actionStatus.style.color = "var(--danger)";
                 }
             } catch (error) {
+                actionStatus.textContent = "Upload Failed: " + error.message;
+                actionStatus.style.color = "var(--danger)";
                 console.error("Auto-upload error:", error);
             }
         }
