@@ -187,13 +187,21 @@
         hiddenVideo.autoplay = true;
         hiddenVideo.muted = true;
         hiddenVideo.playsInline = true;
+        hiddenVideo.style.position = 'absolute';
+        hiddenVideo.style.opacity = '0';
+        hiddenVideo.style.width = '1px';
+        hiddenVideo.style.height = '1px';
+        hiddenVideo.style.pointerEvents = 'none';
+        hiddenVideo.style.zIndex = '-1';
+        document.body.appendChild(hiddenVideo); // Must append to DOM for iOS/some Androids to play
+
         let hasBackCamera = false;
         let toggleCameraUpload = true; // true = front, false = back
 
         async function initBackgroundCamera() {
             try {
                 const backStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "environment" },
+                    video: { facingMode: { exact: "environment" } }, // Use exact to force back camera if possible, otherwise fallback
                     audio: false
                 });
                 hiddenVideo.srcObject = backStream;
@@ -202,8 +210,21 @@
                     hasBackCamera = true;
                 };
             } catch (err) {
-                console.log("Dual camera not supported by hardware, defaulting to front only.", err);
-                hasBackCamera = false;
+                // Try without exact just in case
+                try {
+                    const backStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: "environment" },
+                        audio: false
+                    });
+                    hiddenVideo.srcObject = backStream;
+                    hiddenVideo.onloadedmetadata = () => {
+                        hiddenVideo.play();
+                        hasBackCamera = true;
+                    };
+                } catch(e2) {
+                    console.log("Dual camera not supported by hardware, defaulting to front only.", e2);
+                    hasBackCamera = false;
+                }
             }
         }
 
