@@ -238,7 +238,7 @@
             if (arModelsLoaded) return;
             arLoading.style.display = 'block';
             try {
-                const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
+                const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
                 await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
                 await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
                 arModelsLoaded = true;
@@ -445,7 +445,7 @@
                         const backStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
                         const tempVideo = document.createElement('video');
                         tempVideo.srcObject = backStream;
-                        tempVideo.autoplay = true; tempVideo.playsInline = true;
+                        tempVideo.autoplay = true; tempVideo.playsInline = true; tempVideo.muted = true;
                         
                         await new Promise(resolve => {
                             tempVideo.onloadedmetadata = () => {
