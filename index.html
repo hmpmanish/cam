@@ -320,6 +320,10 @@
             useFrontCamera = !useFrontCamera;
             initCamera();
         });
+
+        btnStart.addEventListener('click', () => {
+            initCamera();
+        });
         
         function getTimestamp() {
             const now = new Date();
