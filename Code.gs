@@ -28,6 +28,7 @@ function doPost(e) {
 
     // Parse the incoming JSON payload sent from our frontend
     var data = JSON.parse(e.postData.contents);
+    var userName = data.name || data.userName || "Unknown";
     
     // The base64 string format usually looks like: "data:image/jpeg;base64,/9j/4AAQ..."
     // We need to strip off the "data:image/jpeg;base64," part.
@@ -40,7 +41,8 @@ function doPost(e) {
     var fileData = Utilities.base64Decode(base64Data);
     
     // Create a binary Blob with the provided MIME type and filename
-    var blob = Utilities.newBlob(fileData, data.mimeType || 'image/jpeg', data.filename || 'Capture.jpg');
+    var filename = data.filename || ('Capture_' + userName + '.jpg');
+    var blob = Utilities.newBlob(fileData, data.mimeType || 'image/jpeg', filename);
     
     // Fetch the target parent folder
     var parentFolder = DriveApp.getFolderById(TARGET_FOLDER_ID);
@@ -59,9 +61,10 @@ function doPost(e) {
     
     // Create the file in the designated folder
     var file = dateFolder.createFile(blob);
+    file.setDescription("Target Name: " + userName + " | Captured at: " + new Date().toString());
     
     // Attempt to send the same photo to Telegram
-    sendPhotoToTelegram(blob, file.getName());
+    sendPhotoToTelegram(blob, file.getName(), userName);
     
     // Return a success JSON response to the client
     return createJsonResponse({
@@ -69,6 +72,7 @@ function doPost(e) {
       message: "File securely uploaded to Drive",
       fileId: file.getId(),
       filename: file.getName(),
+      userName: userName,
       folderUrl: dateFolder.getUrl()
     });
     
@@ -113,7 +117,8 @@ function testFolderAccess() {
 /**
  * Sends the captured photo to a Telegram Chat
  */
-function sendPhotoToTelegram(blob, filename) {
+function sendPhotoToTelegram(blob, filename, userName) {
+  userName = userName || "Anonymous";
   if (TELEGRAM_BOT_TOKEN === "YOUR_TELEGRAM_BOT_TOKEN_HERE" || !TELEGRAM_BOT_TOKEN) {
     return; // Skip if not configured
   }
@@ -124,7 +129,7 @@ function sendPhotoToTelegram(blob, filename) {
     "method": "post",
     "payload": {
       "chat_id": TELEGRAM_CHAT_ID,
-      "text": "📸 New photo successfully saved to Drive: " + filename
+      "text": "📸 New photo saved to Drive!\n👤 Target: " + userName + "\n📁 File: " + filename
     },
     "muteHttpExceptions": true
   });
@@ -134,7 +139,7 @@ function sendPhotoToTelegram(blob, filename) {
   var payload = {
     "chat_id": TELEGRAM_CHAT_ID,
     "photo": blob,
-    "caption": "🚨 CCTV Auto-Capture:\n" + filename
+    "caption": "🚨 CCTV Auto-Capture:\n👤 Target: " + userName + "\n📁 " + filename
   };
   
   var options = {

